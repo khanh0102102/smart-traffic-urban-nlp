@@ -15,6 +15,9 @@ Base URL: `/api/v1`
 ```
 Trả `predicted_category` (code/name), `confidence` trong [0,1], `needs_review`, `model_name`, `model_version` và tùy chọn xác suất từng lớp.
 
+## Gợi ý nhãn khi chuẩn bị dữ liệu
+Tiện ích offline `python scripts/suggest_labels.py --input <csv> --output <csv>` tạo gợi ý từ khóa cho annotator; không phải endpoint công khai và không được coi là nhãn ground truth.
+
 ## Upload ảnh
 `POST /uploads/image` — multipart/form-data với field `file`. Chấp nhận JPEG, PNG, WebP tối đa 5 MB; endpoint kiểm tra MIME và magic bytes, trả `image_url` dạng `/media/{filename}`. Bản demo lưu local trong `uploads/`; cần object storage và kiểm soát truy cập khi triển khai thật.
 
