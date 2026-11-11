@@ -21,8 +21,10 @@
 ## Mở rộng ứng dụng
 - [ ] Thay / bổ sung bản đồ Vietmap khi có API key và điều kiện sử dụng.
 - [ ] Lưu ảnh vào object storage, phân quyền truy cập và retention policy.
-- [ ] Xác thực và phân quyền Admin thật (JWT/OAuth, audit).
-- [ ] Heatmap theo vùng và bộ lọc thời gian.
+- [x] Đăng nhập Admin bằng password hash PBKDF2 và JWT; API key chỉ là fallback local trong development.
+- [x] Heatmap mật độ cơ bản trên Leaflet từ các báo cáo có GPS, có thể bật/tắt lớp heatmap và marker.
+- [ ] Phân quyền nhiều vai trò, quản lý tài khoản, đổi/khóa mật khẩu và audit bảo mật nâng cao.
+- [ ] Heatmap theo vùng địa lý, bộ lọc thời gian và tổng hợp theo ward/district.
 - [ ] Chatbot giao tiếp.
 - [ ] Human-in-the-loop, review queue và export.
 - [ ] Dataset versioning, model registry, retraining có phê duyệt và rollback.
