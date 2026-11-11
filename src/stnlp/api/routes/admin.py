@@ -123,7 +123,11 @@ def moderate_report(
     log = ModerationLog(
         report_id=report.id,
         admin_identifier=admin_identifier,
-        old_category_id=latest.category_id if latest else report.confirmed_category_id,
+        old_category_id=(
+            report.confirmed_category_id
+            if report.confirmed_category_id is not None
+            else (latest.category_id if latest else None)
+        ),
         new_category_id=category.id,
         note=payload.note,
     )
