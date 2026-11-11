@@ -54,6 +54,14 @@ Tạo CSV theo `data/templates/traffic_reports_template.csv` với hai cột:
 
 Mỗi dòng cần có nhãn được con người kiểm tra. Xem `docs/DATASET_GUIDE.md` để thu thập hợp pháp, gán nhãn, loại trùng và tránh rò rỉ dữ liệu. Mục tiêu dữ liệu cần quyết định từ thống kê và learning curve; không dùng số mẫu minh họa làm kết quả.
 
+## 5.1. Gợi ý nhãn bằng từ khóa để người gán nhãn kiểm tra
+
+```powershell
+python scripts/suggest_labels.py --input data/raw/collected_reports.csv --output data/interim/label_suggestions.csv
+```
+
+Công cụ chỉ tạo `suggested_label`, từ khóa khớp và trạng thái `pending`; tất cả dòng đều cần con người duyệt. Dòng không có từ khóa hoặc mơ hồ không tự động biến thành R11. Chỉ sau khi hoàn tất gán nhãn, đưa CSV có cột `text,label` đã được xác nhận vào `data/processed/`. Quy tắc hiện tại là baseline, cần rà soát theo dữ liệu thực tế và trao đổi với giảng viên.
+
 ## 6. Huấn luyện bốn mô hình
 ```powershell
 python -m stnlp.training.train --data data/processed/traffic_reports.csv --artifacts-dir artifacts --epochs 12
@@ -94,4 +102,4 @@ Các script PowerShell: `scripts/setup.ps1`, `scripts/train.ps1 -Dataset <path>`
 - Không tự động retrain từ nhãn Admin khi chưa kiểm tra chất lượng và đánh giá độc lập.
 
 ## 12. Tài liệu
-Xem `docs/PROJECT_SCOPE.md`, `docs/DATASET_GUIDE.md`, `docs/API_CONTRACT.md`, `docs/MODEL_CARD_TEMPLATE.md`, `docs/ROADMAP.md`.
+Xem `docs/PROJECT_SCOPE.md`, `docs/DATASET_GUIDE.md`, `docs/LABELING_GUIDELINES.md`, `docs/API_CONTRACT.md`, `docs/MODEL_CARD_TEMPLATE.md`, `docs/TESTING_GUIDE.md`, `docs/TEAM_WORKFLOW.md`, `docs/ROADMAP.md`.
