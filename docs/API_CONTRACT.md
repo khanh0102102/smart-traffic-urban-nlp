@@ -33,8 +33,12 @@ Tiện ích offline `python scripts/suggest_labels.py --input <csv> --output <cs
 ```
 Lưu report + prediction và trả mã tiếp nhận cùng kết quả. Tọa độ phải hợp lệ và latitude/longitude phải được gửi cùng nhau. Frontend có thể lấy GPS hoặc cho người dùng click bản đồ Leaflet. Upload ảnh là tùy chọn.
 
-## Admin
-Các endpoint dưới `/admin` yêu cầu header `X-Admin-Key` khớp `API_ADMIN_KEY`.
+## Admin authentication
+- `POST /auth/login` nhận username/password, trả JWT bearer token.
+- `GET /auth/me` trả danh tính tài khoản đang đăng nhập.
+- Tài khoản ban đầu được seed bằng `ADMIN_USERNAME` và `ADMIN_PASSWORD_HASH` trong môi trường. Tạo password hash bằng `python scripts/hash_password.py`.
+- JWT được ký bằng `JWT_SECRET_KEY`, thời hạn cấu hình bởi `JWT_EXPIRE_MINUTES`.
+- Các endpoint quản trị nhận `Authorization: Bearer <token>`. Header `X-Admin-Key` chỉ là fallback trong `APP_ENV=development`, tự động từ chối trong `production`.
 - `GET /admin/reports?skip=0&limit=50&needs_review=true`
 - `GET /admin/reports/{report_id}`
 - `PATCH /admin/reports/{report_id}/moderation` với body `{"category_code":"R03","note":"..." }`
