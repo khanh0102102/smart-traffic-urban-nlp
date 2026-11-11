@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import joblib
@@ -11,25 +12,20 @@ from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.utils.class_weight import compute_sample_weight
 
-from stnlp.labels import LABEL_CODES
 from stnlp.preprocessing.transformer import VietnameseTextTransformer
 
 
 def build_classical_models(random_state: int = 42) -> dict[str, Pipeline]:
-    common = {
-        "preprocess": VietnameseTextTransformer(remove_stops=True),
-        "tfidf": TfidfVectorizer(
-            token_pattern=r"(?u)\b\w+\b",
-            ngram_range=(1, 2),
-            min_df=1,
-            max_features=100_000,
-            sublinear_tf=True,
-        ),
-    }
     return {
         "naive_bayes": Pipeline([
-            ("preprocess", common["preprocess"]),
-            ("tfidf", common["tfidf"]),
+            ("preprocess", VietnameseTextTransformer(remove_stops=True)),
+            ("tfidf", TfidfVectorizer(
+                token_pattern=r"(?u)\b\w+\b",
+                ngram_range=(1, 2),
+                min_df=1,
+                max_features=100_000,
+                sublinear_tf=True,
+            )),
             ("classifier", MultinomialNB(alpha=0.5)),
         ]),
         "svm": Pipeline([
@@ -65,4 +61,14 @@ def save_classical(pipeline: Pipeline, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "model.joblib"
     joblib.dump(pipeline, path)
+    metadata = {
+        "model_name": output_dir.name,
+        "model_version": "v1",
+        "artifact": "model.joblib",
+        "preprocessing": "stnlp.preprocessing.transformer.VietnameseTextTransformer",
+        "vectorizer": "TfidfVectorizer",
+    }
+    (output_dir / "metadata.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return path
