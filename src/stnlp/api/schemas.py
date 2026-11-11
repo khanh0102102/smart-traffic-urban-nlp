@@ -3,6 +3,17 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+class AdminLoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class AdminTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in_minutes: int
+
+
 class PredictRequest(BaseModel):
     text: str = Field(min_length=3, max_length=5000)
     include_probabilities: bool = True

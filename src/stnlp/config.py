@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables / .env."""
 
 from functools import lru_cache
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,6 +11,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     api_admin_key: str = "change-this-demo-key-before-use"
+    admin_username: str = "admin"
+    admin_password_hash: str = ""
+    jwt_secret_key: str = "change-this-jwt-secret-before-use"
+    jwt_expire_minutes: int = Field(default=120, ge=5, le=1440)
     database_url: str = "sqlite:///./stnlp.db"
     model_name: str = "svm"
     model_artifact_dir: str = "artifacts"

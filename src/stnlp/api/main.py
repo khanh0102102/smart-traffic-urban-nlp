@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from stnlp.config import settings
 from stnlp.database.init_db import initialize_database
 from stnlp.inference.predictor import get_predictor
-from stnlp.api.routes import admin, health, predict, reports, uploads
+from stnlp.api.routes import admin, auth, health, predict, reports, uploads
 from stnlp.api.routes.uploads import UPLOAD_DIR
 
 
@@ -34,11 +34,12 @@ app.add_middleware(
     allow_origins=settings.cors_origin_list,
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["Content-Type", "X-Admin-Key"],
+    allow_headers=["Content-Type", "X-Admin-Key", "Authorization"],
 )
 
 prefix = settings.api_v1_prefix.rstrip("/")
 app.include_router(health.router, prefix=prefix)
+app.include_router(auth.router, prefix=prefix)
 app.include_router(predict.router, prefix=prefix)
 app.include_router(reports.router, prefix=prefix)
 app.include_router(admin.router, prefix=prefix)
