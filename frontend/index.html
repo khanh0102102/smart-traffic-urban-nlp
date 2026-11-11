@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ST-NLP — hệ thống phân loại phản ánh giao thông và đô thị tiếng Việt">
+  <title>ST-NLP | Phản ánh đô thị thông minh</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand-mark">ST</div>
+    <div>
+      <div class="brand-name">ST-NLP</div>
+      <div class="brand-caption">SMART TRAFFIC &amp; URBAN INCIDENT CLASSIFIER</div>
+    </div>
+    <a class="docs-link" href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <p class="eyebrow">ĐÔ THỊ THÔNG MINH · TIẾP NHẬN PHẢN ÁNH</p>
+      <h1>Cùng xây dựng thành phố <span>an toàn hơn.</span></h1>
+      <p class="hero-copy">Gửi phản ánh về giao thông và hạ tầng đô thị. ST-NLP hỗ trợ phân loại nội dung tiếng Việt để chuyển đến cán bộ phụ trách.</p>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel report-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">CÔNG DÂN</p>
+            <h2>Gửi phản ánh hiện trường</h2>
+          </div>
+          <span class="step-pill">01 / 02</span>
+        </div>
+        <form id="report-form">
+          <label for="report-text">Nội dung phản ánh <span class="required">*</span></label>
+          <textarea id="report-text" name="text" minlength="3" maxlength="5000" rows="6" placeholder="Ví dụ: Hố ga trước số nhà 45 bị mất nắp, gây nguy hiểm cho người đi đường..." required></textarea>
+          <div class="field-hint">Mô tả rõ vị trí và sự cố. Không nhập thông tin cá nhân không cần thiết.</div>
+
+          <div class="form-row">
+            <div>
+              <label for="latitude">Vĩ độ (tùy chọn)</label>
+              <input id="latitude" type="number" step="any" min="-90" max="90" placeholder="16.0471">
+            </div>
+            <div>
+              <label for="longitude">Kinh độ (tùy chọn)</label>
+              <input id="longitude" type="number" step="any" min="-180" max="180" placeholder="108.2068">
+            </div>
+          </div>
+          <label for="image-url">URL hình ảnh (tùy chọn)</label>
+          <input id="image-url" type="url" maxlength="1000" placeholder="https://...">
+          <p class="field-hint">Bản demo hiện nhận URL có sẵn; chức năng tải ảnh trực tiếp và bản đồ sẽ được bổ sung ở giai đoạn mở rộng.</p>
+          <button id="submit-report" class="primary-button" type="submit">
+            <span>Gửi phản ánh</span><span aria-hidden="true">→</span>
+          </button>
+          <p id="form-message" class="message" role="status" aria-live="polite"></p>
+        </form>
+      </article>
+
+      <aside class="panel result-panel">
+        <p class="eyebrow">KẾT QUẢ HỆ THỐNG</p>
+        <h2>Phân loại bằng AI</h2>
+        <div id="empty-result" class="empty-state">
+          <div class="empty-icon">✳</div>
+          <strong>Kết quả sẽ xuất hiện tại đây</strong>
+          <p>Sau khi gửi phản ánh, hệ thống sẽ xử lý văn bản và trả về nhóm phân loại cùng độ tin cậy.</p>
+        </div>
+        <div id="prediction-result" class="prediction-result hidden" aria-live="polite">
+          <div class="result-label">NHÓM DỰ ĐOÁN</div>
+          <div id="predicted-name" class="predicted-name">—</div>
+          <div class="confidence-row"><span>Độ tin cậy mô hình</span><strong id="confidence-value">—</strong></div>
+          <div class="progress-track"><div id="confidence-bar" class="progress-value"></div></div>
+          <div id="review-warning" class="warning hidden">Cần cán bộ kiểm duyệt thủ công do độ tin cậy không vượt ngưỡng cấu hình.</div>
+          <div class="report-code-row"><span>Mã tiếp nhận</span><strong id="report-code">—</strong></div>
+          <div class="report-code-row"><span>Trạng thái</span><strong id="report-status">—</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel admin-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p>
+          <h2>Admin Dashboard</h2>
+          <p class="field-hint">Bản demo được bảo vệ bằng API key đặt trong biến môi trường API_ADMIN_KEY.</p>
+        </div>
+        <span class="admin-tag">ADMIN</span>
+      </div>
+      <div class="admin-controls">
+        <div class="admin-key-wrap">
+          <label for="admin-key">Admin API key</label>
+          <input id="admin-key" type="password" autocomplete="off" placeholder="Nhập API key">
+        </div>
+        <button id="load-admin" class="secondary-button" type="button">Tải dữ liệu quản trị</button>
+      </div>
+      <div id="admin-message" class="message" role="status"></div>
+      <div id="admin-stats" class="stats-grid"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mã phản ánh</th><th>Nội dung</th><th>AI dự đoán</th><th>Độ tin cậy</th><th>Trạng thái</th><th>Kiểm duyệt</th></tr></thead>
+          <tbody id="reports-table"><tr><td colspan="6" class="empty-table">Chưa tải dữ liệu.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <footer>ST-NLP · Nghiên cứu phân loại phản ánh giao thông / đô thị tiếng Việt</footer>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
