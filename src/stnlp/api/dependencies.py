@@ -11,12 +11,23 @@ from stnlp.config import settings
 from stnlp.database.models import AdminUser
 from stnlp.database.session import get_db
 
+_DEFAULT_JWT_SECRET = "change-this-jwt-secret-before-use"
+
 
 def require_admin(
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_admin_key: str | None = Header(default=None, alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ) -> str:
+    if (
+        settings.app_env.casefold() == "production"
+        and settings.jwt_secret_key == _DEFAULT_JWT_SECRET
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cần thay JWT_SECRET_KEY mặc định trước khi bật môi trường production.",
+        )
+
     # API key fallback is intentionally available only in development for local testing.
     configured_key = settings.api_admin_key
     if (
