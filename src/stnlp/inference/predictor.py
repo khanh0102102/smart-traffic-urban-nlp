@@ -9,11 +9,9 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.preprocessing.text import tokenizer_from_json
 
 from stnlp.config import Settings, settings
-from stnlp.labels import LABEL_CODES, LABEL_TO_NAME
+from stnlp.labels import LABEL_CODES
 from stnlp.preprocessing.text import preprocess_text
 
 
@@ -47,25 +45,27 @@ class ModelPredictor:
         return self.model is not None
 
     def _load(self) -> None:
+        if self.model_name not in {"naive_bayes", "svm", "cnn", "lstm"}:
+            self.load_error = f"MODEL_NAME không hợp lệ: {self.model_name}"
+            return
         model_dir = Path(self.config.model_artifact_dir) / self.model_name
         try:
             classical_path = model_dir / "model.joblib"
             deep_path = model_dir / "model.keras"
-            if classical_path.exists():
+            if self.model_name in {"naive_bayes", "svm"} and classical_path.exists():
                 self.model = joblib.load(classical_path)
-                classifier = self.model.named_steps.get("classifier")
-                classes = getattr(classifier, "classes_", None)
-                if classes is not None:
-                    self.labels = [str(value) for value in classes]
-            elif deep_path.exists():
+                classifier = self.model.named_steps["classifier"]
+                self.labels = [str(value) for value in classifier.classes_]
+            elif self.model_name in {"cnn", "lstm"} and deep_path.exists():
                 from tensorflow.keras.models import load_model
+                from tensorflow.keras.preprocessing.text import tokenizer_from_json
 
-                self.model = load_model(deep_path)
                 tokenizer_path = model_dir / "tokenizer.json"
                 metadata_path = model_dir / "metadata.json"
                 labels_path = model_dir / "labels.json"
                 if not tokenizer_path.exists() or not metadata_path.exists():
                     raise FileNotFoundError("Thiếu tokenizer.json hoặc metadata.json.")
+                self.model = load_model(deep_path)
                 self.tokenizer = tokenizer_from_json(
                     tokenizer_path.read_text(encoding="utf-8")
                 )
@@ -74,11 +74,16 @@ class ModelPredictor:
                 if labels_path.exists():
                     self.labels = json.loads(labels_path.read_text(encoding="utf-8"))
             else:
-                raise FileNotFoundError(f"Không tìm thấy model.joblib hoặc model.keras trong {model_dir}")
+                raise FileNotFoundError(
+                    f"Không tìm thấy artifact phù hợp cho {self.model_name} trong {model_dir}"
+                )
+
             metadata_path = model_dir / "metadata.json"
             if metadata_path.exists():
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                self.model_version = str(metadata.get("model_version", metadata.get("trained_at", "v1")))
+                self.model_version = str(
+                    metadata.get("model_version", metadata.get("trained_at", "v1"))
+                )
         except Exception as exc:
             self.model = None
             self.load_error = f"{type(exc).__name__}: {exc}"
@@ -94,8 +99,11 @@ class ModelPredictor:
         if self.model_name in {"naive_bayes", "svm"}:
             predicted = str(self.model.predict([text])[0])
             raw_probabilities = self.model.predict_proba([text])[0]
-            class_codes = [str(value) for value in self.model.classes_]
+            classifier = self.model.named_steps["classifier"]
+            class_codes = [str(value) for value in classifier.classes_]
         else:
+            from tensorflow.keras.preprocessing.sequence import pad_sequences
+
             cleaned = preprocess_text(text)
             sequence = self.tokenizer.texts_to_sequences([cleaned])
             x_value = pad_sequences(
@@ -110,8 +118,11 @@ class ModelPredictor:
             code: float(probability)
             for code, probability in zip(class_codes, raw_probabilities)
         }
+        if predicted not in probability_map:
+            raise ModelNotReadyError(
+                f"Nhãn dự đoán {predicted} không có trong mapping xác suất của artifact."
+            )
         confidence = float(probability_map[predicted])
-        # Normalize ordering to canonical labels, while preserving all class scores.
         ordered = {code: probability_map.get(code, 0.0) for code in LABEL_CODES}
         return Prediction(
             predicted_code=predicted,
