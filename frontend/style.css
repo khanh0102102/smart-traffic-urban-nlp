@@ -82,3 +82,16 @@ footer { padding: 28px 0 40px; text-align: center; color: #879397; font-size: 10
   .panel { padding: 20px; } .admin-controls { align-items: stretch; flex-direction: column; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
 }
+
+.admin-login { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; }
+.admin-login-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-width: 280px; }
+.admin-login-fields label { margin-top: 0; }
+.admin-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-actions .secondary-button { white-space: nowrap; }
+.dev-auth { margin-top: 14px; color: var(--muted); font-size: 11px; }
+.dev-auth summary { cursor: pointer; font-weight: 700; }
+.dev-auth input { max-width: 420px; }
+@media (max-width: 760px) {
+  .admin-login-fields { grid-template-columns: 1fr; min-width: 100%; }
+  .admin-actions { width: 100%; }
+}
