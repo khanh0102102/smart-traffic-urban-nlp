@@ -7,15 +7,15 @@
 ## 1. Phạm vi phiên bản
 - Pipeline tiền xử lý tiếng Việt: làm sạch HTML/URL, chuẩn hóa Unicode NFC, chuẩn hóa một số viết tắt, tách từ bằng Underthesea (ưu tiên) hoặc PyVi, lọc stopwords có giữ từ phủ định.
 - TF-IDF cho Multinomial Naive Bayes / SVM; Tokenizer + Embedding cho 1D-CNN / LSTM.
-- Huấn luyện bốn mô hình trên cùng cách chia Train / Validation / Test; xuất metrics, classification report, confusion matrix và artifacts.
-- FastAPI: health, predict, tạo phản ánh, danh sách/chi tiết quản trị, kiểm duyệt và thống kê.
+- Huấn luyện và đánh giá bốn mô hình trên cùng cách chia Train / Validation / Test; xuất metrics, classification report, confusion matrix và artifacts.
+- FastAPI: health, predict, tạo phản ánh, danh sách/chi tiết quản trị, kiểm duyệt, thống kê và upload ảnh.
 - SQLAlchemy: SQLite mặc định; MySQL qua biến môi trường / Docker Compose.
-- Website demo tiếng Việt: gửi phản ánh, xem dự đoán, Admin xem danh sách và hiệu chỉnh nhãn bằng API key.
+- Website demo tiếng Việt: gửi phản ánh, xem dự đoán, chọn tọa độ bằng Leaflet/GPS, đính kèm ảnh và Admin xem danh sách / chỉnh nhãn bằng API key.
 
-Các phần mở rộng như Vietmap/Leaflet, tải ảnh, chatbot, tài khoản quản trị đầy đủ, heatmap và quy trình tái huấn luyện có kiểm soát được ghi trong roadmap; không giả định là đã cấu hình dịch vụ bên ngoài.
+Bản đồ mặc định dùng Leaflet + OpenStreetMap nên cần Internet trong trình duyệt; có thể thay tile layer bằng Vietmap khi nhóm có API key. Tải ảnh hiện lưu local trong `uploads/`; khi triển khai thật nên chuyển sang object storage. Chatbot, tài khoản quản trị đầy đủ, heatmap và workflow tái huấn luyện có kiểm soát vẫn là phần mở rộng.
 
 ## 2. Công nghệ
-Python 3.11; Pandas; NumPy; Scikit-learn; TensorFlow/Keras; Underthesea / PyVi; FastAPI; SQLAlchemy; MySQL; HTML/CSS/JavaScript.
+Python 3.11; Pandas; NumPy; Scikit-learn; TensorFlow/Keras; Underthesea / PyVi; FastAPI; SQLAlchemy; MySQL; HTML/CSS/JavaScript; Leaflet.
 
 ## 3. Cấu trúc chính
 ```text
@@ -29,7 +29,8 @@ src/stnlp/
 frontend/               # website demo
 data/                    # raw, interim, processed, samples, templates
 artifacts/               # mô hình đã huấn luyện (không commit mặc định)
-tests/ docs/
+uploads/                 # ảnh demo (không commit ảnh người dùng)
+tests/ docs/ scripts/
 ```
 
 ## 4. Cài đặt local (Windows PowerShell)
@@ -41,31 +42,31 @@ py -3.11 -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
+pip install -e .
 Copy-Item .env.example .env
 ```
-Nếu PowerShell chặn kích hoạt, dùng Command Prompt với `.venv\Scripts\activate.bat`. Dùng Python 3.11 64-bit.
+Có thể chạy nhanh `Set-ExecutionPolicy -Scope Process Bypass` cho cửa sổ PowerShell hiện tại nếu bị chặn script kích hoạt. Dùng Python 3.11 64-bit.
 
 ## 5. Chuẩn bị dữ liệu thật
 Tạo CSV theo `data/templates/traffic_reports_template.csv` với hai cột:
 - `text`: nội dung phản ánh tiếng Việt.
 - `label`: mã `R01` ... `R11` (hoặc tên nhãn chuẩn trong `src/stnlp/labels.py`).
 
-Mỗi dòng cần có nhãn được con người kiểm tra. Xem `docs/DATASET_GUIDE.md` để thu thập hợp pháp, gán nhãn, loại trùng và tránh rò rỉ dữ liệu. Mục tiêu dữ liệu cần quyết định từ thống kê và learning curve; không dùng số mẫu mẫu minh họa làm kết quả.
+Mỗi dòng cần có nhãn được con người kiểm tra. Xem `docs/DATASET_GUIDE.md` để thu thập hợp pháp, gán nhãn, loại trùng và tránh rò rỉ dữ liệu. Mục tiêu dữ liệu cần quyết định từ thống kê và learning curve; không dùng số mẫu minh họa làm kết quả.
 
 ## 6. Huấn luyện bốn mô hình
 ```powershell
-pip install -e .
 python -m stnlp.training.train --data data/processed/traffic_reports.csv --artifacts-dir artifacts --epochs 12
 ```
 Lệnh tạo artifact cho NB, SVM, CNN, LSTM và báo cáo ở `artifacts/evaluation/`. Chọn mô hình dựa trên Validation (ưu tiên Macro F1 và recall từng lớp); Test chỉ dùng cho đánh giá cuối.
 
-## 7. Chạy API
+## 7. Chạy API và Website
 ```powershell
 uvicorn stnlp.api.main:app --reload
 ```
 Website: http://127.0.0.1:8000/ · Swagger: http://127.0.0.1:8000/docs · Health: http://127.0.0.1:8000/api/v1/health
 
-Nếu chưa có artifact, health vẫn hoạt động nhưng dự đoán trả HTTP 503.
+Nếu chưa có artifact, health vẫn hoạt động nhưng dự đoán trả HTTP 503. Leaflet/OpenStreetMap cần Internet; GPS cần quyền định vị của trình duyệt.
 
 ## 8. Cấu hình
 Trong `.env`: `MODEL_NAME=svm` (hoặc naive_bayes/cnn/lstm), `MODEL_ARTIFACT_DIR=artifacts`, `DATABASE_URL=sqlite:///./stnlp.db`, `API_ADMIN_KEY=...`. API key là bảo vệ demo; không dùng secret mẫu cho triển khai công khai.
@@ -76,18 +77,20 @@ Copy-Item .env.example .env
 # Sửa MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD và API_ADMIN_KEY trong .env
 docker compose up --build
 ```
-Gắn thư mục artifacts đã huấn luyện; chưa có artifact thì chức năng dự đoán chưa sẵn sàng.
+Compose chạy MySQL + API và mount `artifacts/`, `uploads/`; chưa có artifact thì dự đoán chưa sẵn sàng.
 
 ## 10. Kiểm thử
 ```powershell
 pytest -q
 ```
+Các script PowerShell: `scripts/setup.ps1`, `scripts/train.ps1 -Dataset <path>`, `scripts/run-api.ps1 -Reload`.
 
 ## 11. Giới hạn
 - Không commit dữ liệu cá nhân, ảnh, secret hoặc artifact lớn.
-- API key demo chưa thay thế IAM/JWT production.
+- API key chỉ bảo vệ demo, chưa thay thế IAM/JWT production.
 - Confidence không đồng nghĩa xác suất đúng đã được hiệu chỉnh; cần đánh giá calibration.
 - Ngưỡng kiểm duyệt mặc định 0.60 theo mô tả đề tài và có thể cấu hình.
+- Upload local cần thay bằng object storage, kiểm soát truy cập và quét nội dung khi production.
 - Không tự động retrain từ nhãn Admin khi chưa kiểm tra chất lượng và đánh giá độc lập.
 
 ## 12. Tài liệu
