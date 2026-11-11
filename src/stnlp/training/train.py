@@ -11,12 +11,13 @@ import numpy as np
 import pandas as pd
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from stnlp.labels import LABEL_CODES
+from stnlp.labels import LABEL_CODES, LABEL_TO_NAME
 from stnlp.training.classical import build_classical_models, fit_classical, save_classical
 from stnlp.training.data import load_dataset, stratified_split
 from stnlp.training.deep_learning import train_deep_model
 from stnlp.training.metrics import calculate_metrics, save_evaluation
 from stnlp.training.error_analysis import save_error_analysis
+from stnlp.preprocessing.text import preprocess_text
 
 
 def _set_seed(seed: int) -> None:
@@ -30,10 +31,7 @@ def _set_seed(seed: int) -> None:
 
 
 def _evaluate_deep(model, tokenizer, max_len, texts, labels):
-    clean_texts = [
-        __import__("stnlp.preprocessing.text", fromlist=["preprocess_text"]).preprocess_text(t)
-        for t in texts
-    ]
+    clean_texts = [preprocess_text(text) for text in texts]
     sequences = tokenizer.texts_to_sequences(clean_texts)
     x_values = pad_sequences(sequences, maxlen=max_len, padding="post", truncating="post")
     probabilities = model.predict(x_values, verbose=0)
@@ -57,7 +55,7 @@ def run_training(args) -> dict:
     label_distribution = frame["label"].value_counts().reindex(LABEL_CODES, fill_value=0)
     pd.DataFrame({
         "label": list(LABEL_CODES),
-        "label_name": [__import__("stnlp.labels", fromlist=["LABEL_TO_NAME"]).LABEL_TO_NAME[c] for c in LABEL_CODES],
+        "label_name": [LABEL_TO_NAME[code] for code in LABEL_CODES],
         "count": label_distribution.astype(int).tolist(),
     }).to_csv(evaluation_dir / "dataset_label_distribution.csv", index=False, encoding="utf-8-sig")
 
@@ -106,6 +104,7 @@ def run_training(args) -> dict:
         test_predictions, _ = _evaluate_deep(model, tokenizer, max_len, x_test, y_test)
         val_metrics = calculate_metrics(y_val, val_predictions)
         test_metrics = save_evaluation(evaluation_dir, model_name, y_test, test_predictions)
+        save_error_analysis(evaluation_dir, model_name, x_test, y_test, test_predictions)
         validation_scores[model_name] = val_metrics["macro_f1"]
         summary["models"][model_name] = {
             "validation": val_metrics,
