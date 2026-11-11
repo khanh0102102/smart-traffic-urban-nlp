@@ -7,6 +7,7 @@ const LABELS = [
   ["R10", "Đỗ xe cản trở"], ["R11", "Khác"],
 ];
 const byId = (id) => document.getElementById(id);
+let adminAccessToken = null;
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 }[char]));
@@ -123,7 +124,42 @@ function renderResult(result) {
 }
 
 function adminHeaders() {
-  return { "X-Admin-Key": byId("admin-key").value.trim() };
+  if (adminAccessToken) return { Authorization: `Bearer ${adminAccessToken}` };
+  const apiKey = byId("admin-key").value.trim();
+  return apiKey ? { "X-Admin-Key": apiKey } : {};
+}
+
+byId("login-admin").addEventListener("click", loginAdmin);
+byId("logout-admin").addEventListener("click", () => {
+  adminAccessToken = null;
+  byId("admin-password").value = "";
+  byId("logout-admin").disabled = true;
+  setMessage(byId("admin-message"), "Đã đăng xuất khỏi phiên quản trị.");
+});
+
+async function loginAdmin() {
+  const username = byId("admin-username").value.trim();
+  const password = byId("admin-password").value;
+  if (!username || !password) {
+    setMessage(byId("admin-message"), "Nhập tên đăng nhập và mật khẩu.", "error");
+    return;
+  }
+  try {
+    const response = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.detail || "Đăng nhập thất bại.");
+    adminAccessToken = body.access_token;
+    byId("admin-password").value = "";
+    byId("logout-admin").disabled = false;
+    setMessage(byId("admin-message"), "Đăng nhập thành công.", "success");
+    await loadAdmin();
+  } catch (error) {
+    setMessage(byId("admin-message"), error.message, "error");
+  }
 }
 
 async function adminFetch(path, options = {}) {
@@ -140,8 +176,8 @@ byId("load-admin").addEventListener("click", loadAdmin);
 
 async function loadAdmin() {
   const message = byId("admin-message");
-  if (!byId("admin-key").value.trim()) {
-    setMessage(message, "Hãy nhập Admin API key.", "error");
+  if (!adminAccessToken && !byId("admin-key").value.trim()) {
+    setMessage(message, "Hãy đăng nhập Admin hoặc nhập API key phát triển local.", "error");
     return;
   }
   try {
