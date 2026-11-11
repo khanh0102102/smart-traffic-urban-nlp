@@ -80,14 +80,26 @@
     <section class="panel admin-panel">
       <div class="panel-heading">
         <div><p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p><h2>Admin Dashboard</h2>
-          <p class="field-hint">Bản demo được bảo vệ bằng API key đặt trong biến môi trường API_ADMIN_KEY.</p>
+          <p class="field-hint">Cán bộ đăng nhập bằng tài khoản Admin. API key chỉ là phương án dự phòng khi phát triển local.</p>
         </div>
         <span class="admin-tag">ADMIN</span>
       </div>
-      <div class="admin-controls">
-        <div class="admin-key-wrap"><label for="admin-key">Admin API key</label><input id="admin-key" type="password" autocomplete="off" placeholder="Nhập API key"></div>
-        <button id="load-admin" class="secondary-button" type="button">Tải dữ liệu quản trị</button>
+      <div class="admin-login">
+        <div class="admin-login-fields">
+          <div><label for="admin-username">Tên đăng nhập</label><input id="admin-username" autocomplete="username" value="admin" placeholder="admin"></div>
+          <div><label for="admin-password">Mật khẩu</label><input id="admin-password" type="password" autocomplete="current-password" placeholder="Mật khẩu Admin"></div>
+        </div>
+        <div class="admin-actions">
+          <button id="login-admin" class="secondary-button" type="button">Đăng nhập</button>
+          <button id="load-admin" class="secondary-button" type="button">Tải dữ liệu</button>
+          <button id="logout-admin" class="text-button" type="button" disabled>Đăng xuất</button>
+        </div>
       </div>
+      <details class="dev-auth">
+        <summary>API key dành cho phát triển local</summary>
+        <label for="admin-key">API_ADMIN_KEY</label>
+        <input id="admin-key" type="password" autocomplete="off" placeholder="Chỉ dùng khi APP_ENV=development">
+      </details>
       <div id="admin-message" class="message" role="status"></div>
       <div id="admin-stats" class="stats-grid"></div>
       <div id="admin-map" class="map-view admin-map" aria-label="Bản đồ các phản ánh đã chọn tọa độ"></div>
