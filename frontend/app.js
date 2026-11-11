@@ -178,8 +178,9 @@ function renderAdminReports(items) {
   table.innerHTML = items.map((item) => {
     const predicted = item.predicted_category?.name || "—";
     const confidence = item.confidence == null ? "—" : `${(item.confidence * 100).toFixed(1)}%`;
-    const review = item.needs_review;
-    const options = LABELS.map(([code, name]) =>
+    const review = item.needs_review && item.status !== "reviewed";
+    const placeholder = `<option value="" disabled ${item.confirmed_category ? "" : "selected"}>Chọn nhãn xác nhận</option>`;
+    const options = placeholder + LABELS.map(([code, name]) =>
       `<option value="${code}" ${item.confirmed_category?.code === code ? "selected" : ""}>${code} — ${escapeHtml(name)}</option>`
     ).join("");
     return `<tr>
@@ -229,6 +230,10 @@ byId("reports-table").addEventListener("click", async (event) => {
   if (!button) return;
   const reportId = button.dataset.moderate;
   const categoryCode = byId(`category-${reportId}`).value;
+  if (!categoryCode) {
+    setMessage(byId("admin-message"), "Hãy chọn nhãn xác nhận trước khi lưu.", "error");
+    return;
+  }
   button.disabled = true;
   try {
     await adminFetch(`/admin/reports/${reportId}/moderation`, {
