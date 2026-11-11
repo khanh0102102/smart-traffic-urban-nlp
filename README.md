@@ -58,7 +58,7 @@ Mỗi dòng cần có nhãn được con người kiểm tra. Xem `docs/DATASET_
 ```powershell
 python -m stnlp.training.train --data data/processed/traffic_reports.csv --artifacts-dir artifacts --epochs 12
 ```
-Lệnh tạo artifact cho NB, SVM, CNN, LSTM và báo cáo ở `artifacts/evaluation/`. Chọn mô hình dựa trên Validation (ưu tiên Macro F1 và recall từng lớp); Test chỉ dùng cho đánh giá cuối.
+Lệnh tạo artifact cho NB, SVM, CNN, LSTM và báo cáo ở `artifacts/evaluation/`: phân bố 11 lớp, metrics, classification report, Confusion Matrix, các câu dự đoán sai và các cặp nhãn nhầm lẫn. Chọn mô hình dựa trên Validation (ưu tiên Macro F1 và recall từng lớp); Test chỉ dùng cho đánh giá cuối. Sau khi huấn luyện, đặt `MODEL_NAME` trong `.env` theo mô hình được chọn và khởi động lại API.
 
 ## 7. Chạy API và Website
 ```powershell
