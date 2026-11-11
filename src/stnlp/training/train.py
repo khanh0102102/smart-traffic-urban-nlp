@@ -16,6 +16,7 @@ from stnlp.training.classical import build_classical_models, fit_classical, save
 from stnlp.training.data import load_dataset, stratified_split
 from stnlp.training.deep_learning import train_deep_model
 from stnlp.training.metrics import calculate_metrics, save_evaluation
+from stnlp.training.error_analysis import save_error_analysis
 
 
 def _set_seed(seed: int) -> None:
@@ -53,6 +54,13 @@ def run_training(args) -> dict:
     x_val, y_val = validation_df["text"].tolist(), validation_df["label"].tolist()
     x_test, y_test = test_df["text"].tolist(), test_df["label"].tolist()
 
+    label_distribution = frame["label"].value_counts().reindex(LABEL_CODES, fill_value=0)
+    pd.DataFrame({
+        "label": list(LABEL_CODES),
+        "label_name": [__import__("stnlp.labels", fromlist=["LABEL_TO_NAME"]).LABEL_TO_NAME[c] for c in LABEL_CODES],
+        "count": label_distribution.astype(int).tolist(),
+    }).to_csv(evaluation_dir / "dataset_label_distribution.csv", index=False, encoding="utf-8-sig")
+
     summary = {
         "dataset": str(args.data),
         "dataset_rows_after_exact_deduplication": int(len(frame)),
@@ -75,6 +83,7 @@ def run_training(args) -> dict:
         save_classical(pipeline, output_root / model_name)
         test_predictions = pipeline.predict(x_test)
         test_metrics = save_evaluation(evaluation_dir, model_name, y_test, test_predictions)
+        save_error_analysis(evaluation_dir, model_name, x_test, y_test, test_predictions)
         summary["models"][model_name] = {
             "validation": val_metrics,
             "test": test_metrics,
