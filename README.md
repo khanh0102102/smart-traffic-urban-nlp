@@ -12,7 +12,7 @@
 - SQLAlchemy: SQLite mặc định; MySQL qua biến môi trường / Docker Compose.
 - Website demo tiếng Việt: gửi phản ánh, xem dự đoán, chọn tọa độ bằng Leaflet/GPS, đính kèm ảnh; Admin đăng nhập bằng mật khẩu đã băm và JWT để xem danh sách / chỉnh nhãn. API key chỉ được hỗ trợ như fallback khi phát triển local.
 
-Bản đồ mặc định dùng Leaflet + OpenStreetMap nên cần Internet trong trình duyệt; có thể thay tile layer bằng Vietmap khi nhóm có API key. Tải ảnh hiện lưu local trong `uploads/`; khi triển khai thật nên chuyển sang object storage. Chatbot, tài khoản quản trị đầy đủ, heatmap và workflow tái huấn luyện có kiểm soát vẫn là phần mở rộng.
+Bản đồ mặc định dùng Leaflet + OpenStreetMap nên cần Internet trong trình duyệt; có thể thay tile layer bằng Vietmap khi nhóm có API key. Admin đã có đăng nhập JWT và Heatmap mật độ cơ bản theo các tọa độ được lưu; phân quyền nhiều vai trò, bộ lọc theo thời gian/khu vực và heatmap phân cụm nâng cao vẫn là phần mở rộng. Tải ảnh hiện lưu local trong `uploads/`; khi triển khai thật nên chuyển sang object storage. Chatbot và workflow tái huấn luyện có kiểm soát vẫn là phần mở rộng.
 
 ## 2. Công nghệ
 Python 3.11; Pandas; NumPy; Scikit-learn; TensorFlow/Keras; Underthesea / PyVi; FastAPI; SQLAlchemy; MySQL; HTML/CSS/JavaScript; Leaflet.
