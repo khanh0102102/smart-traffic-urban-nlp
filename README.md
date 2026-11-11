@@ -10,7 +10,7 @@
 - Huấn luyện và đánh giá bốn mô hình trên cùng cách chia Train / Validation / Test; xuất metrics, classification report, confusion matrix và artifacts.
 - FastAPI: health, predict, tạo phản ánh, danh sách/chi tiết quản trị, kiểm duyệt, thống kê và upload ảnh.
 - SQLAlchemy: SQLite mặc định; MySQL qua biến môi trường / Docker Compose.
-- Website demo tiếng Việt: gửi phản ánh, xem dự đoán, chọn tọa độ bằng Leaflet/GPS, đính kèm ảnh và Admin xem danh sách / chỉnh nhãn bằng API key.
+- Website demo tiếng Việt: gửi phản ánh, xem dự đoán, chọn tọa độ bằng Leaflet/GPS, đính kèm ảnh; Admin đăng nhập bằng mật khẩu đã băm và JWT để xem danh sách / chỉnh nhãn. API key chỉ được hỗ trợ như fallback khi phát triển local.
 
 Bản đồ mặc định dùng Leaflet + OpenStreetMap nên cần Internet trong trình duyệt; có thể thay tile layer bằng Vietmap khi nhóm có API key. Tải ảnh hiện lưu local trong `uploads/`; khi triển khai thật nên chuyển sang object storage. Chatbot, tài khoản quản trị đầy đủ, heatmap và workflow tái huấn luyện có kiểm soát vẫn là phần mở rộng.
 
@@ -77,12 +77,12 @@ Website: http://127.0.0.1:8000/ · Swagger: http://127.0.0.1:8000/docs · Health
 Nếu chưa có artifact, health vẫn hoạt động nhưng dự đoán trả HTTP 503. Leaflet/OpenStreetMap cần Internet; GPS cần quyền định vị của trình duyệt.
 
 ## 8. Cấu hình
-Trong `.env`: `MODEL_NAME=svm` (hoặc naive_bayes/cnn/lstm), `MODEL_ARTIFACT_DIR=artifacts`, `DATABASE_URL=sqlite:///./stnlp.db`, `API_ADMIN_KEY=...`. API key là bảo vệ demo; không dùng secret mẫu cho triển khai công khai.
+Trong `.env`: `MODEL_NAME=svm` (hoặc naive_bayes/cnn/lstm), `MODEL_ARTIFACT_DIR=artifacts`, `DATABASE_URL=sqlite:///./stnlp.db`. Để tạo tài khoản Admin, chạy `python scripts/hash_password.py`, chép chuỗi hash vào `ADMIN_PASSWORD_HASH`, đặt `ADMIN_USERNAME` và tạo `JWT_SECRET_KEY` ngẫu nhiên bằng `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Khởi động lại API để seed tài khoản ban đầu. JWT mặc định hết hạn sau 120 phút. API key `X-Admin-Key` chỉ được chấp nhận khi `APP_ENV=development`; đặt `APP_ENV=production` khi triển khai và thay mọi secret mẫu.
 
 ## 9. Docker Compose
 ```powershell
 Copy-Item .env.example .env
-# Sửa MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD và API_ADMIN_KEY trong .env
+# Sửa MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, JWT_SECRET_KEY và ADMIN_PASSWORD_HASH trong .env
 docker compose up --build
 ```
 Compose chạy MySQL + API và mount `artifacts/`, `uploads/`; chưa có artifact thì dự đoán chưa sẵn sàng.
@@ -95,7 +95,7 @@ Các script PowerShell: `scripts/setup.ps1`, `scripts/train.ps1 -Dataset <path>`
 
 ## 11. Giới hạn
 - Không commit dữ liệu cá nhân, ảnh, secret hoặc artifact lớn.
-- API key chỉ bảo vệ demo, chưa thay thế IAM/JWT production.
+- Tài khoản Admin dùng PBKDF2 password hash và JWT; cần HTTPS, secret riêng, rate-limit và quy trình đổi/khóa tài khoản trước production.
 - Confidence không đồng nghĩa xác suất đúng đã được hiệu chỉnh; cần đánh giá calibration.
 - Ngưỡng kiểm duyệt mặc định 0.60 theo mô tả đề tài và có thể cấu hình.
 - Upload local cần thay bằng object storage, kiểm soát truy cập và quét nội dung khi production.
