@@ -63,8 +63,13 @@ def list_reports(
     query = db.query(Report).outerjoin(
         Prediction, Prediction.id == latest_prediction_id
     )
-    if needs_review is not None:
-        query = query.filter(Prediction.needs_review.is_(needs_review))
+    if needs_review is True:
+        query = query.filter(
+            Prediction.needs_review.is_(True),
+            Report.status != "reviewed",
+        )
+    elif needs_review is False:
+        query = query.filter(Prediction.needs_review.is_(False))
     total = query.count()
     reports = (
         query.order_by(Report.created_at.desc(), Report.id.desc())
@@ -139,9 +144,19 @@ def admin_stats(
     db: Session = Depends(get_db),
 ):
     total_reports = db.query(func.count(Report.id)).scalar() or 0
+    latest_prediction_id = (
+        db.query(func.max(Prediction.id))
+        .filter(Prediction.report_id == Report.id)
+        .correlate(Report)
+        .scalar_subquery()
+    )
     needs_review_count = (
-        db.query(func.count(Prediction.id))
-        .filter(Prediction.needs_review.is_(True))
+        db.query(func.count(Report.id))
+        .join(Prediction, Prediction.id == latest_prediction_id)
+        .filter(
+            Prediction.needs_review.is_(True),
+            Report.status != "reviewed",
+        )
         .scalar() or 0
     )
     by_category = (
