@@ -16,6 +16,7 @@ let reportMap = null;
 let reportMarker = null;
 let adminMap = null;
 let adminMarkers = null;
+let adminHeatLayer = null;
 
 function setMessage(element, message, type = "") {
   element.textContent = message;
@@ -134,6 +135,11 @@ byId("logout-admin").addEventListener("click", () => {
   adminAccessToken = null;
   byId("admin-password").value = "";
   byId("logout-admin").disabled = true;
+  byId("admin-stats").innerHTML = "";
+  byId("category-stats").innerHTML = "";
+  byId("reports-table").innerHTML = '<tr><td colspan="6" class="empty-table">Vui lòng đăng nhập để xem dữ liệu.</td></tr>';
+  if (adminMarkers) adminMarkers.clearLayers();
+  if (adminHeatLayer) adminHeatLayer.setLatLngs([]);
   setMessage(byId("admin-message"), "Đã đăng xuất khỏi phiên quản trị.");
 });
 
@@ -203,6 +209,15 @@ function renderStats(stats) {
   byId("admin-stats").innerHTML = cards.map(([label, value]) =>
     `<div class="stat-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
   ).join("");
+
+  const maximum = Math.max(1, ...stats.predictions_by_category.map((item) => item.count));
+  byId("category-stats").innerHTML = stats.predictions_by_category.map((item) => {
+    const width = Math.max(0, Math.min(100, (item.count / maximum) * 100));
+    return `<div class="category-stat">
+      <div class="category-stat-heading"><span>${escapeHtml(item.code)} · ${escapeHtml(item.name)}</span><strong>${escapeHtml(item.count)}</strong></div>
+      <div class="category-track"><div class="category-fill" style="width:${width.toFixed(1)}%"></div></div>
+    </div>`;
+  }).join("");
 }
 
 function renderAdminReports(items) {
@@ -246,20 +261,40 @@ function renderAdminMap(items) {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(adminMap);
-    adminMarkers = L.layerGroup().addTo(adminMap);
+    adminMarkers = L.layerGroup();
+    adminHeatLayer = L.heatLayer([], { radius: 28, blur: 22, maxZoom: 17 });
   }
   adminMarkers.clearLayers();
   const bounds = [];
+  const heatPoints = [];
   mapped.forEach((item) => {
     const point = [item.latitude, item.longitude];
     bounds.push(point);
+    heatPoints.push([item.latitude, item.longitude, 1]);
     const title = `${escapeHtml(item.report_code)} — ${escapeHtml(item.predicted_category?.name || "Chưa phân loại")}`;
     L.marker(point).bindPopup(title).addTo(adminMarkers);
   });
+  adminHeatLayer.setLatLngs(heatPoints);
+  if (byId("show-heatmap").checked) adminHeatLayer.addTo(adminMap);
+  else if (adminMap.hasLayer(adminHeatLayer)) adminMap.removeLayer(adminHeatLayer);
+  if (byId("show-markers").checked) adminMarkers.addTo(adminMap);
+  else if (adminMap.hasLayer(adminMarkers)) adminMap.removeLayer(adminMarkers);
   if (bounds.length === 1) adminMap.setView(bounds[0], 15);
   else adminMap.fitBounds(bounds, { padding: [20, 20], maxZoom: 15 });
   setTimeout(() => adminMap.invalidateSize(), 100);
 }
+
+byId("show-heatmap").addEventListener("change", () => {
+  if (!adminMap || !adminHeatLayer) return;
+  if (byId("show-heatmap").checked) adminHeatLayer.addTo(adminMap);
+  else adminMap.removeLayer(adminHeatLayer);
+});
+
+byId("show-markers").addEventListener("change", () => {
+  if (!adminMap || !adminMarkers) return;
+  if (byId("show-markers").checked) adminMarkers.addTo(adminMap);
+  else adminMap.removeLayer(adminMarkers);
+});
 
 byId("reports-table").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-moderate]");
