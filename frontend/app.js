@@ -1,27 +1,65 @@
 const API = "/api/v1";
 const LABELS = [
-  ["R01", "Đường/cầu/hạ tầng hư hỏng"],
-  ["R02", "Điện lực/chiếu sáng"],
-  ["R03", "Cống/hố ga/thoát nước"],
-  ["R04", "Vỉa hè/lòng đường"],
-  ["R05", "Cây xanh/vật cản"],
-  ["R06", "Biển báo"],
-  ["R07", "Tổ chức giao thông"],
-  ["R08", "Đèn tín hiệu"],
-  ["R09", "Rác thải/vệ sinh môi trường"],
-  ["R10", "Đỗ xe cản trở"],
-  ["R11", "Khác"],
+  ["R01", "Đường/cầu/hạ tầng hư hỏng"], ["R02", "Điện lực/chiếu sáng"],
+  ["R03", "Cống/hố ga/thoát nước"], ["R04", "Vỉa hè/lòng đường"],
+  ["R05", "Cây xanh/vật cản"], ["R06", "Biển báo"], ["R07", "Tổ chức giao thông"],
+  ["R08", "Đèn tín hiệu"], ["R09", "Rác thải/vệ sinh môi trường"],
+  ["R10", "Đỗ xe cản trở"], ["R11", "Khác"],
 ];
-
 const byId = (id) => document.getElementById(id);
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 }[char]));
 
+let reportMap = null;
+let reportMarker = null;
+let adminMap = null;
+let adminMarkers = null;
+
 function setMessage(element, message, type = "") {
   element.textContent = message;
   element.className = type ? `message ${type}` : "message";
 }
+
+function setCoordinates(latitude, longitude) {
+  byId("latitude").value = Number(latitude).toFixed(7);
+  byId("longitude").value = Number(longitude).toFixed(7);
+  if (reportMap) {
+    const point = [Number(latitude), Number(longitude)];
+    if (reportMarker) reportMarker.setLatLng(point);
+    else reportMarker = L.marker(point).addTo(reportMap);
+    reportMap.setView(point, 16);
+  }
+}
+
+function initializeReportMap() {
+  const container = byId("report-map");
+  if (!window.L || !container) {
+    container.textContent = "Không tải được thư viện bản đồ. Có thể nhập tọa độ thủ công.";
+    return;
+  }
+  reportMap = L.map(container).setView([16.0471, 108.2068], 13);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(reportMap);
+  reportMap.on("click", (event) => setCoordinates(event.latlng.lat, event.latlng.lng));
+  setTimeout(() => reportMap.invalidateSize(), 100);
+}
+
+initializeReportMap();
+
+byId("locate-button").addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    setMessage(byId("form-message"), "Trình duyệt không hỗ trợ định vị.", "error");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (position) => setCoordinates(position.coords.latitude, position.coords.longitude),
+    (error) => setMessage(byId("form-message"), `Không lấy được vị trí: ${error.message}`, "error"),
+    { enableHighAccuracy: true, timeout: 10000 },
+  );
+});
 
 byId("report-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -40,13 +78,21 @@ byId("report-form").addEventListener("submit", async (event) => {
     payload.latitude = Number(latitudeValue);
     payload.longitude = Number(longitudeValue);
   }
-  const imageUrl = byId("image-url").value.trim();
-  if (imageUrl) payload.image_url = imageUrl;
 
   button.disabled = true;
   button.querySelector("span").textContent = "Đang xử lý...";
   setMessage(message, "");
   try {
+    const imageFile = byId("image-file").files[0];
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append("file", imageFile);
+      const uploadResponse = await fetch(`${API}/uploads/image`, { method: "POST", body: formData });
+      const uploadBody = await uploadResponse.json();
+      if (!uploadResponse.ok) throw new Error(uploadBody.detail || "Không thể tải ảnh.");
+      payload.image_url = uploadBody.image_url;
+    }
+
     const response = await fetch(`${API}/reports`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -105,6 +151,7 @@ async function loadAdmin() {
     ]);
     renderStats(stats);
     renderAdminReports(reports.items);
+    renderAdminMap(reports.items);
     setMessage(message, `Đã tải ${reports.items.length} / ${reports.total} phản ánh.`, "success");
   } catch (error) {
     setMessage(message, error.message, "error");
@@ -141,12 +188,40 @@ function renderAdminReports(items) {
       <td>${escapeHtml(predicted)}</td>
       <td>${escapeHtml(confidence)}</td>
       <td><span class="status-pill ${review ? "review" : ""}">${escapeHtml(item.status)}</span></td>
-      <td>
-        <select id="category-${item.id}" aria-label="Nhãn xác nhận cho ${escapeHtml(item.report_code)}">${options}</select>
-        <button class="small-button" data-moderate="${item.id}">Lưu nhãn</button>
-      </td>
+      <td><select id="category-${item.id}" aria-label="Nhãn xác nhận">${options}</select>
+        <button class="small-button" data-moderate="${item.id}">Lưu nhãn</button></td>
     </tr>`;
   }).join("");
+}
+
+function renderAdminMap(items) {
+  const mapped = items.filter((item) => item.latitude != null && item.longitude != null);
+  const container = byId("admin-map");
+  if (!window.L || !container) {
+    container.classList.add("hidden");
+    return;
+  }
+  container.classList.toggle("hidden", mapped.length === 0);
+  if (!mapped.length) return;
+  if (!adminMap) {
+    adminMap = L.map(container).setView([mapped[0].latitude, mapped[0].longitude], 12);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(adminMap);
+    adminMarkers = L.layerGroup().addTo(adminMap);
+  }
+  adminMarkers.clearLayers();
+  const bounds = [];
+  mapped.forEach((item) => {
+    const point = [item.latitude, item.longitude];
+    bounds.push(point);
+    const title = `${escapeHtml(item.report_code)} — ${escapeHtml(item.predicted_category?.name || "Chưa phân loại")}`;
+    L.marker(point).bindPopup(title).addTo(adminMarkers);
+  });
+  if (bounds.length === 1) adminMap.setView(bounds[0], 15);
+  else adminMap.fitBounds(bounds, { padding: [20, 20], maxZoom: 15 });
+  setTimeout(() => adminMap.invalidateSize(), 100);
 }
 
 byId("reports-table").addEventListener("click", async (event) => {

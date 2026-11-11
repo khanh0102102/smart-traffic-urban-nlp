@@ -11,15 +11,15 @@ from fastapi.staticfiles import StaticFiles
 from stnlp.config import settings
 from stnlp.database.init_db import initialize_database
 from stnlp.inference.predictor import get_predictor
-from stnlp.api.routes import health, predict, reports, admin
+from stnlp.api.routes import admin, health, predict, reports, uploads
+from stnlp.api.routes.uploads import UPLOAD_DIR
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     initialize_database()
-    # Load the selected artifact once at startup. Missing artifacts are reported by readiness
-    # and prediction endpoints; the API itself remains available for health checks.
     get_predictor()
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
 
@@ -43,11 +43,13 @@ app.include_router(health.router, prefix=prefix)
 app.include_router(predict.router, prefix=prefix)
 app.include_router(reports.router, prefix=prefix)
 app.include_router(admin.router, prefix=prefix)
+app.include_router(uploads.router, prefix=prefix)
 
 ROOT = Path(__file__).resolve().parents[3]
 FRONTEND_DIR = ROOT / "frontend"
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+    app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 
     @app.get("/", include_in_schema=False)
     def index():

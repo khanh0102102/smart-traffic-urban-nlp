@@ -21,6 +21,8 @@ artifacts/*
 !artifacts/.gitkeep
 reports/*
 !reports/.gitkeep
+uploads/*
+!uploads/.gitkeep
 *.db
 *.sqlite3
 .vscode/

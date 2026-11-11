@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="ST-NLP — hệ thống phân loại phản ánh giao thông và đô thị tiếng Việt">
   <title>ST-NLP | Phản ánh đô thị thông minh</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -27,10 +28,7 @@
     <section class="content-grid">
       <article class="panel report-panel">
         <div class="panel-heading">
-          <div>
-            <p class="eyebrow">CÔNG DÂN</p>
-            <h2>Gửi phản ánh hiện trường</h2>
-          </div>
+          <div><p class="eyebrow">CÔNG DÂN</p><h2>Gửi phản ánh hiện trường</h2></div>
           <span class="step-pill">01 / 02</span>
         </div>
         <form id="report-form">
@@ -39,18 +37,19 @@
           <div class="field-hint">Mô tả rõ vị trí và sự cố. Không nhập thông tin cá nhân không cần thiết.</div>
 
           <div class="form-row">
-            <div>
-              <label for="latitude">Vĩ độ (tùy chọn)</label>
-              <input id="latitude" type="number" step="any" min="-90" max="90" placeholder="16.0471">
-            </div>
-            <div>
-              <label for="longitude">Kinh độ (tùy chọn)</label>
-              <input id="longitude" type="number" step="any" min="-180" max="180" placeholder="108.2068">
-            </div>
+            <div><label for="latitude">Vĩ độ</label><input id="latitude" type="number" step="any" min="-90" max="90" placeholder="16.0471"></div>
+            <div><label for="longitude">Kinh độ</label><input id="longitude" type="number" step="any" min="-180" max="180" placeholder="108.2068"></div>
           </div>
-          <label for="image-url">URL hình ảnh (tùy chọn)</label>
-          <input id="image-url" type="url" maxlength="1000" placeholder="https://...">
-          <p class="field-hint">Bản demo hiện nhận URL có sẵn; chức năng tải ảnh trực tiếp và bản đồ sẽ được bổ sung ở giai đoạn mở rộng.</p>
+          <div class="map-heading">
+            <label>Chọn vị trí trên bản đồ (tùy chọn)</label>
+            <button id="locate-button" class="text-button" type="button">Dùng vị trí hiện tại</button>
+          </div>
+          <div id="report-map" class="map-view" aria-label="Bản đồ chọn vị trí phản ánh"></div>
+          <p class="field-hint">Bản đồ demo dùng Leaflet + OpenStreetMap. Nhấn lên bản đồ để chọn tọa độ; trình duyệt cần được cấp quyền nếu dùng GPS.</p>
+
+          <label for="image-file">Ảnh hiện trường (tùy chọn, tối đa 5 MB)</label>
+          <input id="image-file" type="file" accept="image/jpeg,image/png,image/webp">
+          <p class="field-hint">Ảnh được lưu trong thư mục uploads ở bản demo. Khi triển khai thật nên dùng object storage.</p>
           <button id="submit-report" class="primary-button" type="submit">
             <span>Gửi phản ánh</span><span aria-hidden="true">→</span>
           </button>
@@ -80,22 +79,19 @@
 
     <section class="panel admin-panel">
       <div class="panel-heading">
-        <div>
-          <p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p>
-          <h2>Admin Dashboard</h2>
+        <div><p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p><h2>Admin Dashboard</h2>
           <p class="field-hint">Bản demo được bảo vệ bằng API key đặt trong biến môi trường API_ADMIN_KEY.</p>
         </div>
         <span class="admin-tag">ADMIN</span>
       </div>
       <div class="admin-controls">
-        <div class="admin-key-wrap">
-          <label for="admin-key">Admin API key</label>
-          <input id="admin-key" type="password" autocomplete="off" placeholder="Nhập API key">
-        </div>
+        <div class="admin-key-wrap"><label for="admin-key">Admin API key</label><input id="admin-key" type="password" autocomplete="off" placeholder="Nhập API key"></div>
         <button id="load-admin" class="secondary-button" type="button">Tải dữ liệu quản trị</button>
       </div>
       <div id="admin-message" class="message" role="status"></div>
       <div id="admin-stats" class="stats-grid"></div>
+      <div id="admin-map" class="map-view admin-map" aria-label="Bản đồ các phản ánh đã chọn tọa độ"></div>
+      <p class="field-hint">Các điểm chỉ hiển thị với phản ánh có tọa độ GPS.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Mã phản ánh</th><th>Nội dung</th><th>AI dự đoán</th><th>Độ tin cậy</th><th>Trạng thái</th><th>Kiểm duyệt</th></tr></thead>
@@ -105,6 +101,7 @@
     </section>
     <footer>ST-NLP · Nghiên cứu phân loại phản ánh giao thông / đô thị tiếng Việt</footer>
   </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/static/app.js" defer></script>
 </body>
 </html>
