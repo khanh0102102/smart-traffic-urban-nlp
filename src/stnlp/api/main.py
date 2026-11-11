@@ -19,7 +19,6 @@ from stnlp.api.routes.uploads import UPLOAD_DIR
 async def lifespan(app: FastAPI):
     initialize_database()
     get_predictor()
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
 
@@ -48,6 +47,7 @@ app.include_router(uploads.router, prefix=prefix)
 ROOT = Path(__file__).resolve().parents[3]
 FRONTEND_DIR = ROOT / "frontend"
 if FRONTEND_DIR.exists():
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
     app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 
