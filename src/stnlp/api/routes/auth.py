@@ -11,10 +11,16 @@ from stnlp.database.models import AdminUser
 from stnlp.database.session import get_db
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+_DEFAULT_JWT_SECRET = "change-this-jwt-secret-before-use"
 
 
 @router.post("/login", response_model=AdminTokenOut)
 def login(payload: AdminLoginRequest, db: Session = Depends(get_db)):
+    if settings.app_env.casefold() == "production" and settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Cần thay JWT_SECRET_KEY mặc định trước khi bật môi trường production.",
+        )
     if not settings.admin_password_hash:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
