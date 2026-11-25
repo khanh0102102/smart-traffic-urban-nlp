@@ -29,6 +29,7 @@ from app.schemas.ml_management import (
     DatasetSampleCreate,
     DatasetSamplePage,
     DatasetSampleRead,
+    DatasetSampleUpdate,
     DatasetSamplesBulkCreate,
     DatasetUpdate,
     TrainingMetricRead,
