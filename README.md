@@ -21,15 +21,25 @@ python scripts/seed_categories.py
 ```
 Wait until `stnlp-postgres` is healthy before running migrations. The default database is `stnlp` on port `5432`.
 
-## Phases 4–9 – Data processing, Vietnamese NLP preprocessing, TF-IDF, Embedding, Naive Bayes and SVM
-Install the ML dependencies and run the included sample. The pipeline cleans source text, applies Unicode NFC and abbreviation normalization, segments Vietnamese words, removes conservative stopwords, deduplicates, labels and splits the dataset:
+## Phases 4–10 – Data processing, Vietnamese NLP preprocessing, TF-IDF, Embedding, Naive Bayes, SVM and 1D CNN
+Install the base ML dependencies and prepare the sample dataset:
 
 ```powershell
 python -m pip install -r ml/requirements.txt
 python ml/scripts/prepare_dataset.py --input ml/data/sample_reports.csv --text-column content --label-column category
 ```
 
-Inspect the NLP stages independently with `python ml/scripts/inspect_nlp.py --text "Đg. này ko thông thoáng tại Q.1"`. After Phase 4–5 completes, build TF-IDF matrices with `python ml/scripts/build_tfidf.py --dataset-dir ml/data/processed --output ml/artifacts/tfidf`. The vectorizer is fitted on train only and transforms validation/test with the same vocabulary. Next, create padded sequences and label IDs with `python ml/scripts/build_embedding.py --dataset-dir ml/data/processed --output ml/artifacts/embedding`. The tokenizer is fitted on train only; the canonical R01–R11 label mapping remains fixed. Train the Naive Bayes baseline with `python ml/scripts/train_naive_bayes.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/naive_bayes`, then predict raw reports with `python ml/scripts/predict_naive_bayes.py --text "Đèn đường bị hỏng"`. Train the SVM baseline with `python ml/scripts/train_svm.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/svm`; sigmoid probability calibration is performed on train only when class counts permit. Predict with `python ml/scripts/predict_svm.py --text "Đèn đường bị hỏng"`. See [`ml/README.md`](ml/README.md) for details. Processed data and model artifacts remain local and are excluded from Git.
+Run Phase 5 preprocessing through the dataset pipeline, then build TF-IDF matrices with `python ml/scripts/build_tfidf.py --dataset-dir ml/data/processed --output ml/artifacts/tfidf`. Build the Phase 7 padded token sequences with `python ml/scripts/build_embedding.py --dataset-dir ml/data/processed --output ml/artifacts/embedding`. The vocabulary is fitted on train only, and the R01–R11 label mapping remains fixed. Train the Naive Bayes and SVM baselines with `python ml/scripts/train_naive_bayes.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/naive_bayes` and `python ml/scripts/train_svm.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/svm`.
+
+For the neural model, install the optional TensorFlow dependency and train the 1D CNN from Phase 7 sequences:
+
+```powershell
+python -m pip install -r ml/requirements-embedding.txt
+python ml/scripts/train_cnn.py --embedding-dir ml/artifacts/embedding --output ml/artifacts/cnn
+python ml/scripts/predict_cnn.py --text "Đèn đường bị hỏng"
+```
+
+The CNN uses parallel Conv1D kernels, padding-aware max pooling and an 11-class softmax layer. The CNN model and all generated ML artifacts remain local and are excluded from Git. See [`ml/README.md`](ml/README.md) for the commands, options and data-splitting details.
 
 ## Run backend
 ```powershell
