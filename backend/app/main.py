@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.reports import router as reports_router
+from app.api.routes.predictions import router as predictions_router
 from app.core.config import settings
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -16,7 +17,7 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version="0.5.0",
     description="Backend API for the Smart Traffic & Urban Incident Classifier.",
 )
 
@@ -34,6 +35,7 @@ if (FRONTEND_DIR / "assets").is_dir():
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(predictions_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)

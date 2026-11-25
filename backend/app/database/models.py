@@ -98,16 +98,21 @@ class ModelVersion(TimestampMixin, Base):
 
 class Prediction(TimestampMixin, Base):
     __tablename__ = "predictions"
-    __table_args__ = (CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_predictions_confidence"), Index("ix_predictions_report_created", "report_id", "created_at"), Index("ix_predictions_needs_review", "needs_review"))
+    __table_args__ = (CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_predictions_confidence"), CheckConstraint("confidence_type IN ('model_score', 'calibrated_probability', 'unavailable')", name="ck_predictions_confidence_type"), Index("ix_predictions_report_created", "report_id", "created_at"), Index("ix_predictions_needs_review", "needs_review"))
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     report_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("reports.id", ondelete="CASCADE"), nullable=False)
     preprocessing_run_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("preprocessing_runs.id", ondelete="SET NULL"))
     model_version_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("model_versions.id", ondelete="RESTRICT"), nullable=False)
     predicted_category_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("incident_categories.id", ondelete="RESTRICT"), nullable=False)
-    confidence: Mapped[Decimal] = mapped_column(Numeric(6, 5), nullable=False)
+    # Uncalibrated SVM predictions legitimately have no probability/confidence value.
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(6, 5), nullable=True)
+    confidence_type: Mapped[str] = mapped_column(String(32), nullable=False, default="model_score", server_default="model_score")
+    probability_calibrated: Mapped[bool | None] = mapped_column(Boolean)
+    decision_margin: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     class_probabilities: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     inference_time_ms: Mapped[int | None] = mapped_column(Integer)
     needs_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    review_reasons: Mapped[list[str] | None] = mapped_column(JSON)
     report: Mapped[Report] = relationship(back_populates="predictions")
     preprocessing_run: Mapped[PreprocessingRun | None] = relationship(back_populates="predictions")
     model_version: Mapped[ModelVersion] = relationship(back_populates="predictions")
