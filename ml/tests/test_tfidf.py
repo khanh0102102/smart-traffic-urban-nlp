@@ -98,3 +98,25 @@ def test_tfidf_requires_phase5_processed_text_column(tmp_path):
         assert "processed_text" in str(exc)
     else:
         raise AssertionError("Expected an error when Phase 5 processed_text is missing.")
+
+def test_tfidf_exports_unit_idf_when_idf_weighting_is_disabled(tmp_path):
+    dataset = tmp_path / "processed"
+    dataset.mkdir()
+    _write_split(dataset / "train.csv", [
+        ("duong hu hong", "R01"),
+        ("den tin hieu hong", "R08"),
+        ("duong ngap nuoc", "R03"),
+    ])
+    _write_split(dataset / "validation.csv", [])
+    _write_split(dataset / "test.csv", [])
+    output = tmp_path / "tfidf"
+
+    build_tfidf(TfidfConfig(
+        dataset_dir=str(dataset),
+        output_dir=str(output),
+        use_idf=False,
+    ))
+
+    vocabulary = pd.read_csv(output / "vocabulary.csv", encoding="utf-8-sig")
+    assert set(vocabulary["idf"].tolist()) == {1.0}
+
