@@ -51,6 +51,7 @@ class SVMResult:
     probability_calibrated: bool
     calibration_method: str | None
     calibration_cv: int | None
+    calibration_reason: str | None
     validation_accuracy: float | None
     test_accuracy: float | None
     model_path: str
@@ -160,10 +161,11 @@ def _fit_svm(
         )
         return base_estimator, False, None, reason
 
-    if config.calibration_method == "isotonic" and min_class_count < 1000:
+    if config.calibration_method == "isotonic" and len(y_train) < 3000:
         raise ValueError(
-            "Isotonic calibration is not recommended with fewer than 1000 training "
-            "examples in every class. Use --calibration-method sigmoid or add data."
+            "Isotonic calibration is not recommended with fewer than 3000 total "
+            "training rows (the calibration fold would contain fewer than roughly "
+            "1000 rows with three-fold CV). Use sigmoid calibration or add data."
         )
 
     cv_folds = min(config.calibration_cv, min_class_count)
@@ -535,6 +537,7 @@ def train_svm(config: SVMConfig | None = None) -> SVMResult:
         probability_calibrated=probability_calibrated,
         calibration_method=config.calibration_method if probability_calibrated else None,
         calibration_cv=calibration_cv,
+        calibration_reason=calibration_reason,
         validation_accuracy=None if validation_metrics is None else validation_metrics["accuracy"],
         test_accuracy=None if test_metrics is None else test_metrics["accuracy"],
         model_path=str(model_path),
