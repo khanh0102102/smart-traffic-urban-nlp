@@ -34,6 +34,9 @@ def test_pipeline_deduplicates_and_exports_review_and_splits(tmp_path):
     assert (output/"needs_review.csv").exists()
     assert (output/"duplicates.csv").exists()
     assert (output/"dataset_summary.json").exists()
+    train = (output/"train.csv").read_text(encoding="utf-8-sig")
+    assert "standardized_text" in train.splitlines()[0]
+    assert "processed_text" in train.splitlines()[0]
 
 
 def test_conflicting_labels_on_duplicate_text_are_sent_to_review(tmp_path):

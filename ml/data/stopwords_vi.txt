@@ -1,0 +1,12 @@
+# Conservative function-word list. Keep negation, location, time, quantity and incident terms.
+và
+là
+của
+các
+những
+thì
+mà
+khi
+nếu
+để
+rằng
