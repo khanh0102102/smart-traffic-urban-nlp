@@ -85,6 +85,74 @@ Artifacts are written under `ml/artifacts/tfidf/` and remain local because the `
 ```powershell
 python -m pytest ml/tests/test_tfidf.py -q
 ```
+## Phase 7 – Tokenizer, Padding, Embedding and Label Encoder
+
+The module in `ml/src/embedding/` converts Phase 5 `processed_text` into fixed-length integer sequences and converts canonical incident labels R01–R11 into stable numeric IDs.
+
+### Build token sequences and label IDs
+
+Run Phase 4–5 first, then run from the repository root:
+
+```powershell
+python ml/scripts/build_embedding.py --dataset-dir ml/data/processed --output ml/artifacts/embedding
+```
+
+Default settings are a maximum vocabulary of 30,000 entries (including PAD/OOV), minimum token frequency 1, sequence length 200, post-padding, post-truncation, and embedding dimension 128.
+
+### Data leakage and token IDs
+
+- The tokenizer vocabulary is fitted on `train.csv` only. Validation/test words not seen in train map to the OOV token ID `1`.
+- Padding uses token ID `0`; the Keras Embedding layer can mask it with `mask_zero=True`.
+- The vocabulary is deterministic: tokens are ordered by descending frequency and then alphabetically for ties.
+- The label encoder uses the fixed canonical Phase 3 taxonomy R01–R11, not labels discovered from validation/test. This keeps numeric class IDs stable even when a category is absent from a small training split.
+
+### Use a trainable Keras Embedding layer
+
+The sequence and label data pipeline does not require TensorFlow. TensorFlow is an optional dependency only when a downstream neural model needs an actual Keras layer:
+
+```powershell
+python -m pip install -r ml/requirements-embedding.txt
+```
+
+Example in a future Keras model:
+
+```python
+from src.embedding import create_embedding_layer
+
+embedding = create_embedding_layer(
+    vocab_size=tokenizer.vocab_size,
+    embedding_dim=128,
+    mask_zero=True,
+)
+```
+
+The layer starts with trainable random weights. Those weights are learned when the downstream model is trained; this phase prepares the layer configuration and integer inputs, not a pretrained embedding model.
+
+### Generated artifacts
+
+- `X_train.npy`, `X_validation.npy`, `X_test.npy`: padded integer token sequences.
+- `y_train.npy`, `y_validation.npy`, `y_test.npy`: numeric class IDs aligned with the corresponding X rows.
+- `tokenizer.joblib`, `tokenizer.json`: fitted train-only vocabulary and token ID mapping.
+- `label_encoder.joblib`, `class_mapping.csv`: stable mapping between R01–R11 and class IDs.
+- `labels_train.csv`, `labels_validation.csv`, `labels_test.csv`: row index, label code, numeric ID and category name.
+- `vocabulary.csv`: token and token ID; `embedding_config.json`: Keras Embedding layer settings.
+- `embedding_summary.json`: dataset sizes, sequence shapes, vocabulary and class mapping.
+
+Artifacts are written under `ml/artifacts/embedding/` and remain local because `ml/artifacts/*` is excluded from Git.
+
+### Useful options
+
+```powershell
+python ml/scripts/build_embedding.py --dataset-dir ml/data/processed --output ml/artifacts/embedding --max-vocab-size 15000 --min-frequency 2 --max-length 150 --embedding-dim 100
+```
+
+Additional options include `--padding pre|post`, `--truncating pre|post`, `--lowercase`, and `--no-mask-zero`.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_embedding.py -q
+```
 ### Outputs
 - `train.csv`, `validation.csv`, `test.csv`: labeled records split 70/15/15.
 - `labeled_all.csv`: all deduplicated labeled rows before splitting.
