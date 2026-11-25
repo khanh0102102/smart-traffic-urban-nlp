@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -15,10 +15,13 @@ from app.core.security import create_access_token
 from app.database import models  # noqa: F401
 from app.database.base import Base
 from app.database.models import (
+    Dataset,
+    DatasetSample,
     IncidentCategory,
     ModelVersion,
     Prediction,
     PredictionReview,
+    PreprocessingRun,
     Report,
     User,
 )
@@ -315,6 +318,96 @@ def test_inactive_or_unknown_categories_are_rejected(client, db_session):
         )
         assert response.status_code == 422
 
+    assert db_session.scalar(select(PredictionReview)) is None
+
+
+
+def test_review_materializes_verified_dataset_sample_and_keeps_it_current(client, db_session):
+    data = setup_prediction(db_session)
+    dataset = Dataset(
+        name="Reviewed urban reports",
+        version="v1",
+        description="Ground-truth reports accepted by staff.",
+        source="staff-review",
+        created_by=data["receiver"].id,
+    )
+    preprocessing = PreprocessingRun(
+        report_id=data["report"].id,
+        pipeline_version="phase5-v1",
+        cleaned_text=data["report"].raw_content,
+        normalized_text="mat duong co o ga sau gay nguy hiem",
+        segmented_text="mặt đường có ổ_gà sâu gây nguy hiểm",
+        stopwords_removed_text="mặt đường ổ_gà sâu gây nguy hiểm",
+        processing_time_ms=8,
+    )
+    db_session.add_all([dataset, preprocessing])
+    db_session.flush()
+    data["prediction"].preprocessing_run_id = preprocessing.id
+    db_session.commit()
+
+    first = client.post(
+        "/api/v1/reviews",
+        headers=auth_headers(data["receiver"]),
+        json={
+            "prediction_id": str(data["prediction"].id),
+            "confirmed_category_code": "R01",
+            "dataset_id": str(dataset.id),
+            "dataset_split": "TRAIN",
+        },
+    )
+    assert first.status_code == 201, first.text
+    sample = db_session.scalar(
+        select(DatasetSample).where(
+            DatasetSample.dataset_id == dataset.id,
+            DatasetSample.report_id == data["report"].id,
+        )
+    )
+    assert sample is not None
+    assert sample.category_id == data["category_original"].id
+    assert sample.is_verified is True
+    assert sample.split == "TRAIN"
+    assert sample.processed_text == preprocessing.stopwords_removed_text
+
+    second = client.post(
+        "/api/v1/reviews",
+        headers=auth_headers(data["admin"]),
+        json={
+            "prediction_id": str(data["prediction"].id),
+            "confirmed_category_code": "R02",
+        },
+    )
+    assert second.status_code == 201, second.text
+    db_session.refresh(sample)
+    assert sample.category_id == data["category_corrected"].id
+    assert sample.is_verified is True
+    assert sample.split == "TRAIN"
+    assert db_session.scalar(
+        select(func.count(DatasetSample.id)).where(
+            DatasetSample.dataset_id == dataset.id,
+            DatasetSample.report_id == data["report"].id,
+        )
+    ) == 1
+
+    history = db_session.scalars(
+        select(PredictionReview).where(
+            PredictionReview.prediction_id == data["prediction"].id
+        )
+    ).all()
+    assert len(history) == 2
+
+
+def test_review_dataset_id_and_split_must_be_provided_together(client, db_session):
+    data = setup_prediction(db_session)
+    response = client.post(
+        "/api/v1/reviews",
+        headers=auth_headers(data["receiver"]),
+        json={
+            "prediction_id": str(data["prediction"].id),
+            "confirmed_category_code": "R01",
+            "dataset_id": str(uuid4()),
+        },
+    )
+    assert response.status_code == 422
     assert db_session.scalar(select(PredictionReview)) is None
 
 
