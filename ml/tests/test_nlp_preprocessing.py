@@ -45,6 +45,11 @@ def test_stopwords_preserve_negation_and_incident_terms():
     assert tokens == ("đường", "đèn_đường", "không", "bị", "hỏng", "khu_vực")
 
 
+
+def test_default_stopwords_keep_domain_and_location_cues():
+    tokens = remove_stopwords("đường một chiều đang ngập sâu ở dưới cầu")
+    assert tokens == ("đường", "một", "chiều", "đang", "ngập", "sâu", "ở", "dưới", "cầu")
+
 def test_preprocessing_returns_all_pipeline_representations():
     def fake_tokenizer(text, format="text"):
         return "đường này không thông thoáng"
