@@ -42,6 +42,19 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
     ]
 
+    # Report attachment storage is outside PostgreSQL; mount this directory persistently.
+    report_upload_dir: Path = PROJECT_ROOT / "backend" / "storage"
+    report_max_upload_size_bytes: int = 5 * 1024 * 1024
+    report_max_attachments: int = 5
+
+    @property
+    def report_storage_root(self) -> Path:
+        """Resolve relative upload paths against the repository root, not the process CWD."""
+        path = self.report_upload_dir.expanduser()
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path.resolve()
+
     @property
     def sqlalchemy_url(self) -> URL:
         if self.database_url:
