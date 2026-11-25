@@ -61,14 +61,17 @@ def _split(frame: pd.DataFrame, config: ProcessingConfig) -> tuple[pd.DataFrame,
         raise ValueError("train_ratio, validation_ratio and test_ratio must be positive and sum to 1.")
     if len(frame) < 3:
         raise ValueError("At least 3 labeled, unique records are required to create non-empty train/validation/test splits.")
+    # Reserve at least one record for validation and test, even on tiny demo datasets.
+    holdout_count = min(len(frame)-1, max(2, round(len(frame)*(config.validation_ratio+config.test_ratio))))
+    test_count = min(holdout_count-1, max(1, round(holdout_count*config.test_ratio/(config.validation_ratio+config.test_ratio))))
     stratify = frame["label_code"] if frame["label_code"].value_counts().min() >= 3 and frame["label_code"].nunique() > 1 else None
     try:
-        train, holdout = train_test_split(frame, test_size=config.validation_ratio+config.test_ratio, random_state=config.random_state, stratify=stratify)
+        train, holdout = train_test_split(frame, test_size=holdout_count, random_state=config.random_state, stratify=stratify)
         holdout_stratify = holdout["label_code"] if stratify is not None and holdout["label_code"].value_counts().min() >= 2 else None
-        validation, test = train_test_split(holdout, test_size=config.test_ratio/(config.validation_ratio+config.test_ratio), random_state=config.random_state, stratify=holdout_stratify)
+        validation, test = train_test_split(holdout, test_size=test_count, random_state=config.random_state, stratify=holdout_stratify)
     except ValueError:
-        train, holdout = train_test_split(frame, test_size=config.validation_ratio+config.test_ratio, random_state=config.random_state)
-        validation, test = train_test_split(holdout, test_size=config.test_ratio/(config.validation_ratio+config.test_ratio), random_state=config.random_state)
+        train, holdout = train_test_split(frame, test_size=holdout_count, random_state=config.random_state)
+        validation, test = train_test_split(holdout, test_size=test_count, random_state=config.random_state)
     return train.copy(), validation.copy(), test.copy()
 
 def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
