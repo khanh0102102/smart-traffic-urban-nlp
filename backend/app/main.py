@@ -17,7 +17,7 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version="0.5.0",
     description="Backend API for the Smart Traffic & Urban Incident Classifier.",
 )
 
