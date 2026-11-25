@@ -5,7 +5,7 @@ client = TestClient(app)
 def test_health_endpoint_returns_ok():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "application": "ST-NLP", "phase": "16-prediction-api"}
+    assert response.json() == {"status": "ok", "application": "ST-NLP", "phase": "17-review-api"}
 
 def test_citizen_portal_is_served():
     response = client.get("/citizen/")
