@@ -2,7 +2,8 @@
 "use strict";
 const TOKEN="stnlp.admin.access_token",USER="stnlp.admin.user";
 const $=s=>document.querySelector(s);
-const state={token:sessionStorage.getItem(TOKEN),user:null,summary:null,page:1,pageSize:15,totalPages:1,reports:[],categories:[],map:null,markers:[],activeReport:null,attachmentUrls:[],view:"dashboard-view",busy:false};\nconst apiClient=window.STNLPApi.createApiClient({baseURL:"/api/v1",timeout:30000,getToken:()=>sessionStorage.getItem(TOKEN),onUnauthorized:()=>logout(false)});
+const state={token:sessionStorage.getItem(TOKEN),user:null,summary:null,page:1,pageSize:15,totalPages:1,reports:[],categories:[],map:null,markers:[],activeReport:null,attachmentUrls:[],view:"dashboard-view",busy:false};
+const apiClient=window.STNLPApi.createApiClient({baseURL:"/api/v1",timeout:30000,getToken:()=>sessionStorage.getItem(TOKEN),onUnauthorized:()=>logout(false)});
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 const statusLabels={RECEIVED:"Mới tiếp nhận",PROCESSING:"Đang xử lý",RESOLVED:"Đã giải quyết",REJECTED:"Từ chối"};
 function showAlert(target,message,kind){const box=$(target);box.textContent=message;box.className="admin-alert"+(kind==="success"?" success":"");box.classList.remove("hidden")}
