@@ -35,6 +35,7 @@ if (FRONTEND_DIR / "assets").is_dir():
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(predictions_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)
