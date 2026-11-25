@@ -68,10 +68,22 @@ def _tensorflow():
 
 
 def _register_custom_layers(tf):
-    """Register a padding-aware pooling layer before building or loading a model."""
-    registered = getattr(_register_custom_layers, "_layer", None)
+    """Register custom padding layers before building or loading a model."""
+    registered = getattr(_register_custom_layers, "_layers", None)
     if registered is not None:
         return registered
+
+    @tf.keras.utils.register_keras_serializable(package="STNLP")
+    class ZeroPadEmbeddingOutput(tf.keras.layers.Layer):
+        """Force the embedding vector for PAD token ID 0 to remain zero."""
+
+        def call(self, inputs):
+            embeddings, token_ids = inputs
+            valid = tf.expand_dims(tf.not_equal(token_ids, 0), axis=-1)
+            return tf.where(valid, embeddings, tf.zeros_like(embeddings))
+
+        def get_config(self):
+            return super().get_config()
 
     @tf.keras.utils.register_keras_serializable(package="STNLP")
     class MaskedGlobalMaxPooling1D(tf.keras.layers.Layer):
@@ -90,8 +102,11 @@ def _register_custom_layers(tf):
         def get_config(self):
             return super().get_config()
 
-    _register_custom_layers._layer = MaskedGlobalMaxPooling1D
-    return MaskedGlobalMaxPooling1D
+    _register_custom_layers._layers = (
+        MaskedGlobalMaxPooling1D,
+        ZeroPadEmbeddingOutput,
+    )
+    return _register_custom_layers._layers
 
 
 def _validate_config(config: CNNConfig) -> None:
@@ -134,7 +149,7 @@ def build_cnn_model(
 ):
     """Build a parallel-kernel TextCNN with padding-aware global max pooling."""
     tf = _tensorflow()
-    pooling_layer = _register_custom_layers(tf)
+    pooling_layer, zero_pad_layer = _register_custom_layers(tf)
     if vocab_size < 2:
         raise ValueError("vocab_size must include at least PAD and OOV tokens.")
     if sequence_length < 1 or class_count < 2 or embedding_dim < 1:
@@ -150,6 +165,9 @@ def build_cnn_model(
         output_dim=embedding_dim,
         name="token_embedding",
     )(token_ids)
+    embedded = zero_pad_layer(name="zero_pad_embedding_output")(
+        [embedded, token_ids]
+    )
     embedded = tf.keras.layers.SpatialDropout1D(
         embedding_dropout, name="embedding_spatial_dropout"
     )(embedded)
@@ -223,6 +241,14 @@ def _load_embedding_assets(embedding_dir: Path):
     ):
         raise ValueError("The saved label encoder must use canonical categories R01-R11.")
     embedding_config = json.loads(config_path.read_text(encoding="utf-8"))
+    summary_path = embedding_dir / "embedding_summary.json"
+    if summary_path.exists():
+        embedding_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        embedding_config["padding"] = embedding_summary.get("padding", "post")
+        embedding_config["truncating"] = embedding_summary.get("truncating", "post")
+    else:
+        embedding_config["padding"] = "post"
+        embedding_config["truncating"] = "post"
     return tokenizer, label_encoder, embedding_config
 
 
@@ -428,8 +454,8 @@ def train_cnn(config: CNNConfig | None = None) -> CNNResult:
         "category_names": _class_names(),
         "sequence": {
             "max_length": int(x_train.shape[1]),
-            "padding": "post",
-            "truncating": "post",
+            "padding": embedding_config.get("padding", "post"),
+            "truncating": embedding_config.get("truncating", "post"),
             "pad_token_id": 0,
             "oov_token_id": 1,
         },
@@ -552,13 +578,16 @@ def predict_cnn_reports(
     tokenizer = bundle["tokenizer"]
     label_encoder = bundle["label_encoder"]
     sequence_config = bundle["sequence"]
-    pooling_layer = _register_custom_layers(tf)
+    pooling_layer, zero_pad_layer = _register_custom_layers(tf)
     keras_path = bundle_path.parent / bundle["model_file"]
     if not keras_path.exists():
         raise FileNotFoundError(f"Saved Keras model file is missing: {keras_path}.")
     model = tf.keras.models.load_model(
         keras_path,
-        custom_objects={"MaskedGlobalMaxPooling1D": pooling_layer},
+        custom_objects={
+            "MaskedGlobalMaxPooling1D": pooling_layer,
+            "ZeroPadEmbeddingOutput": zero_pad_layer,
+        },
         compile=False,
     )
 
