@@ -374,3 +374,79 @@ python -m pytest ml/tests/test_cnn.py -q
 ```
 
 The CNN tests are skipped automatically when TensorFlow is not installed.
+
+
+## Phase 11 – LSTM text classification
+
+Phase 11 adds a trainable LSTM classifier that reads the same fixed-length integer token sequences prepared by Phase 7. It does not use the Phase 6 TF-IDF matrices. The model contains a trainable Embedding layer, SpatialDropout1D, an LSTM encoder, a Dense/Dropout classifier and an 11-unit softmax output for R01–R11. The default encoder is a one-way LSTM; an optional Bidirectional(LSTM) mode is available.
+
+### Install the optional neural-network dependency
+
+TensorFlow is shared with Phase 10 and remains separate from the base ML requirements:
+
+```powershell
+python -m pip install -r ml/requirements-embedding.txt
+```
+
+### Build Phase 7 sequences and train the LSTM
+
+Run Phase 4–5 data preparation first, then build token sequences and labels. If you have already generated the Phase 7 artifacts and have not changed the dataset or sequence settings, you can reuse them.
+
+```powershell
+python ml/scripts/build_embedding.py --dataset-dir ml/data/processed --output ml/artifacts/embedding
+python ml/scripts/train_lstm.py --embedding-dir ml/artifacts/embedding --output ml/artifacts/lstm
+```
+
+Default configuration: 25 epochs, batch size 32, 128 LSTM units, 64 Dense units, 0.2 embedding spatial dropout, 0.4 LSTM/classifier dropout, Adam learning rate 0.001 and balanced class weights. Early stopping monitors validation loss when validation is non-empty and restores the best weights. When validation is empty, training proceeds without validation-based early stopping.
+
+### Masking, data separation and class mapping
+
+- The LSTM reuses the Phase 7 tokenizer and fixed R01–R11 label encoder. It does not refit the vocabulary or class IDs.
+- The Embedding layer uses `mask_zero=True`; its mask is passed explicitly to the recurrent layer. PAD token ID 0 is ignored for both pre-padding and post-padding. OOV token ID 1 is a real token and is not masked.
+- Only the training split updates LSTM weights and class weights. Validation is used for early stopping and validation metrics only. Test is reserved for final evaluation.
+- The reported maximum softmax score is a model confidence score; it is not a separately calibrated probability.
+
+### Predict a new report
+
+Raw Vietnamese text is passed through the saved Phase 5 preprocessing flow:
+
+```powershell
+python ml/scripts/predict_lstm.py --text "Đèn đường trước nhà bị hỏng nhiều ngày, buổi tối không có ánh sáng"
+```
+
+Predict rows from a CSV file (default input column `content`):
+
+```powershell
+python ml/scripts/predict_lstm.py --input reports_to_classify.csv --text-column content --output lstm_predictions.csv
+```
+
+For a CSV column that already contains Phase 5 `processed_text`, add `--already-processed`.
+
+### Generated artifacts
+
+- `lstm_model.keras`: trained Keras LSTM model.
+- `lstm_bundle.joblib`: fitted Phase 7 tokenizer, label encoder, model filename and inference metadata.
+- `training_history.csv`: per-epoch training/validation loss and accuracy.
+- `predictions_validation.csv`, `predictions_test.csv`: actual/predicted category, confidence, known-token indicator and correctness.
+- `confusion_matrix_validation.csv`, `confusion_matrix_test.csv`: fixed R01–R11 confusion matrices.
+- `lstm_summary.json`: architecture, training parameters, split sizes, trained categories, epoch count and evaluation metrics.
+
+Artifacts are written under `ml/artifacts/lstm/` and remain local because `ml/artifacts/*` is excluded from Git.
+
+### Tune the LSTM
+
+```powershell
+python ml/scripts/train_lstm.py --embedding-dir ml/artifacts/embedding --output ml/artifacts/lstm --epochs 35 --batch-size 32 --lstm-units 96 --dense-units 64 --dropout 0.5 --learning-rate 0.0005 --patience 6
+```
+
+Add `--bidirectional` to use a Bidirectional(LSTM) encoder. Compare settings using validation metrics and keep the test split as a final holdout.
+
+**Data limitation:** the included synthetic sample is suitable for checking the pipeline, not for training a reliable recurrent classifier. LSTM needs a larger, manually reviewed dataset with representative examples in each incident category. If a category is absent from train, the corresponding output class receives no positive training examples and cannot be learned reliably.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_lstm.py -q
+```
+
+The LSTM tests are skipped automatically when TensorFlow is not installed.
