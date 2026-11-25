@@ -5,7 +5,7 @@ from app.database.session import check_database_connection
 router = APIRouter()
 @router.get("/health", tags=["System"], summary="Check API health")
 def health_check() -> dict[str, str]:
-    return {"status": "ok", "application": "ST-NLP", "phase": "3-database"}
+    return {"status": "ok", "application": "ST-NLP", "phase": "14-authentication"}
 @router.get("/health/database", tags=["System"], summary="Check PostgreSQL connectivity")
 def database_health_check() -> dict[str, str]:
     try:
