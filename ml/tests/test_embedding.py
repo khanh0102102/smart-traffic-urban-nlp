@@ -30,7 +30,7 @@ def _write_split(path: Path, rows: list[tuple[str, str]]) -> None:
 
 def test_tokenizer_learns_deterministic_vocab_from_fit_texts_only():
     tokenizer = SequenceTokenizer(max_vocab_size=6).fit([
-        "đèn_đường hỏng",
+        "đường đèn_đường",
         "đường ngập",
     ])
     assert tokenizer.word_index["<PAD>"] == 0
