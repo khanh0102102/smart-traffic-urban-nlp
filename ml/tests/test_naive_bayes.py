@@ -1,6 +1,7 @@
 """Tests for the TF-IDF Multinomial Naive Bayes baseline."""
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import joblib
 import numpy as np
@@ -11,6 +12,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+import src.naive_bayes.model as naive_bayes_module
 
 from src.naive_bayes import (
     NaiveBayesConfig,
@@ -130,3 +133,28 @@ def test_naive_bayes_rejects_unknown_category_codes(tmp_path):
 def test_naive_bayes_rejects_negative_alpha(tmp_path):
     with pytest.raises(ValueError, match="alpha"):
         train_naive_bayes(NaiveBayesConfig(alpha=-0.1))
+
+def test_raw_report_prediction_reuses_phase5_preprocessing(tmp_path, monkeypatch):
+    tfidf_dir = tmp_path / "tfidf"
+    _prepare_tfidf_artifacts(tfidf_dir)
+    output = tmp_path / "naive_bayes"
+    train_naive_bayes(NaiveBayesConfig(
+        tfidf_dir=str(tfidf_dir),
+        output_dir=str(output),
+    ))
+
+    def fake_preprocessor(text, remove_stopwords_enabled=True):
+        assert text == "Raw citizen report"
+        assert remove_stopwords_enabled is True
+        return SimpleNamespace(processed_text="duong o_ga")
+
+    monkeypatch.setattr(
+        naive_bayes_module, "preprocess_vietnamese_text", fake_preprocessor
+    )
+    predictions = predict_reports(
+        ["Raw citizen report"],
+        model_path=output / "naive_bayes_bundle.joblib",
+    )
+    assert predictions[0]["processed_text"] == "duong o_ga"
+    assert predictions[0]["has_known_features"] is True
+
