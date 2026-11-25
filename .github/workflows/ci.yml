@@ -29,5 +29,8 @@ jobs:
           node --check frontend/assets/js/app.js
           node --check frontend/assets/js/admin.js
 
+      - name: Test shared Axios API client
+        run: node --test tests/api-client.test.js
+
       - name: Run tests
         run: python -m pytest -q
