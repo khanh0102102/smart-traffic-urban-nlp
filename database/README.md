@@ -1,8 +1,15 @@
-# Database workspace
+# Database
+ST-NLP uses PostgreSQL 17, SQLAlchemy 2 and Alembic. The schema contains exactly 12 application tables as specified in `DATABASE_STRUCTURE_ST_NLP.txt`.
 
-Database scripts and versioned schema changes will live here.
+Tables: `users`, `incident_categories`, `reports`, `report_attachments`, `preprocessing_runs`, `model_versions`, `predictions`, `prediction_reviews`, `datasets`, `dataset_samples`, `training_runs`, `training_metrics`.
 
-- `migrations/`: ordered schema migrations.
-- `seeds/`: development seed data.
+## Run from repository root (PowerShell)
+```powershell
+docker compose up -d postgres
+python -m pip install -r backend/requirements-dev.txt
+alembic upgrade head
+python scripts/seed_categories.py
+```
+Wait until `stnlp-postgres` is healthy before running migrations. Set `DATABASE_URL` in `.env` if connection settings differ from the local defaults. The migration creates schema; the seed script inserts the fixed 11 category rows idempotently.
 
-The database engine, entity relationships, constraints and migration tooling will be implemented in the database-design phase. Do not store uploaded files or model binaries inside the database; use file/object storage and keep references in database records.
+Uploaded images and model binaries stay outside PostgreSQL. Store only their storage paths in `report_attachments.storage_path` and `model_versions.artifact_path`.

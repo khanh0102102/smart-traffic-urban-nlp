@@ -1,4 +1,4 @@
-"""FastAPI application entry point for the Phase 1 skeleton."""
+"""FastAPI application entry point for the ST-NLP backend."""
 
 from pathlib import Path
 
@@ -7,14 +7,15 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.health import router as health_router
+from app.core.config import settings
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
-    title="ST-NLP API",
-    version="0.1.0",
-    description="Starter API for the Smart Traffic & Urban Incident Classifier.",
+    title=settings.app_name,
+    version="0.2.0",
+    description="Backend API for the Smart Traffic & Urban Incident Classifier.",
 )
 
 if (FRONTEND_DIR / "assets").is_dir():
