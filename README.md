@@ -21,6 +21,16 @@ python scripts/seed_categories.py
 ```
 Wait until `stnlp-postgres` is healthy before running migrations. The default database is `stnlp` on port `5432`.
 
+## Phase 4 – Prepare a dataset
+Install the NLP data-processing dependencies and run the included sample:
+
+```powershell
+python -m pip install -r ml/requirements.txt
+python ml/scripts/prepare_dataset.py --input ml/data/sample_reports.csv --text-column content --label-column category
+```
+
+See [`ml/README.md`](ml/README.md) for supported input formats, custom column mapping, output files, weak-label review rules and split details. Generated datasets remain local and are excluded from Git.
+
 ## Run backend
 ```powershell
 uvicorn app.main:app --app-dir backend --reload
