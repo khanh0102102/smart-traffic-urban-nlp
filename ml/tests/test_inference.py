@@ -11,6 +11,7 @@ import pytest
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.preprocessing import LabelEncoder
+from sklearn.svm import LinearSVC
 
 from src.data_processing.categories import CATEGORIES
 from src.inference import ModelPredictor, build_inference_bundle
@@ -36,6 +37,20 @@ def make_nb_bundle():
     }
 
 
+def make_svm_bundle():
+    bundle = make_nb_bundle()
+    x = bundle["vectorizer"].transform([
+        "duong ho ga hong", "o ga mat duong", "duong nut lun",
+        "den duong hong", "mat dien chieu sang",
+    ])
+    y = bundle["label_encoder"].transform(["R01", "R01", "R01", "R02", "R02"])
+    bundle["model"] = LinearSVC().fit(x, y)
+    bundle["probability_calibrated"] = False
+    bundle["model_type"] = "sklearn.svm.LinearSVC"
+    bundle["calibration_reason"] = "test"
+    return bundle
+
+
 def make_evaluation(path: Path):
     path.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame([
@@ -58,7 +73,7 @@ def test_build_selects_best_validation_macro_f1_and_packages_bundle(tmp_path):
     model_dirs = {key: tmp_path / key for key in ("naive_bayes", "svm", "cnn", "lstm")}
     for directory in model_dirs.values():
         directory.mkdir()
-    joblib.dump(make_nb_bundle(), model_dirs["svm"] / "svm_bundle.joblib")
+    joblib.dump(make_svm_bundle(), model_dirs["svm"] / "svm_bundle.joblib")
     joblib.dump(make_nb_bundle(), model_dirs["naive_bayes"] / "naive_bayes_bundle.joblib")
 
     result = build_inference_bundle(
