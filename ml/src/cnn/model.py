@@ -487,7 +487,7 @@ def train_cnn(config: CNNConfig | None = None) -> CNNResult:
                 "padding": "same",
                 "activation": "relu",
             },
-            "pooling": "MaskedGlobalMaxPooling1D excludes PAD token ID 0",
+            "padding": "ZeroPadEmbeddingOutput zeros PAD vectors before convolution; MaskedGlobalMaxPooling1D excludes PAD positions.",
             "classifier": [
                 {"type": "Dense", "units": config.dense_units, "activation": "relu"},
                 {"type": "Dropout", "rate": config.dropout},
