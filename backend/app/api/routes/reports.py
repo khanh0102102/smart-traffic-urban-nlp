@@ -308,7 +308,7 @@ async def upload_report_attachments(
         original_name = original_name.replace("\x00", "").strip()[:255] or "image"
         validated.append((upload, content, detected_type, original_name))
 
-    storage_root = Path(settings.report_upload_dir).expanduser().resolve()
+    storage_root = settings.report_storage_root
     report_folder = storage_root / "reports" / str(report.id)
     report_folder.mkdir(parents=True, exist_ok=True)
     created_paths: list[Path] = []
@@ -372,7 +372,7 @@ def download_report_attachment(
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found.")
 
-    storage_root = Path(settings.report_upload_dir).expanduser().resolve()
+    storage_root = settings.report_storage_root
     file_path = (storage_root / attachment.storage_path).resolve()
     if storage_root not in file_path.parents or not file_path.is_file():
         raise HTTPException(status_code=404, detail="Attachment file is unavailable.")
