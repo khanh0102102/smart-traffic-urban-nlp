@@ -36,6 +36,7 @@ ml/reports/*
 
 # Runtime and local files
 uploads/
+backend/storage/
 *.db
 *.sqlite3
 *.log
