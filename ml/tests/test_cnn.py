@@ -64,7 +64,9 @@ def test_cnn_architecture_has_eleven_outputs_and_padding_aware_pooling():
     assert model.output_shape == (None, 11)
     assert model.name == "stnlp_text_cnn_1d"
     assert "masked_global_max_3" in [layer.name for layer in model.layers]
-    sample = np.asarray([[2, 3, 0, 0], [4, 5, 6, 0]], dtype=np.int32)
+    sample = np.zeros((2, 12), dtype=np.int32)
+    sample[0, :2] = [2, 3]
+    sample[1, :3] = [4, 5, 6]
     probabilities = model.predict(sample, verbose=0)
     assert probabilities.shape == (2, 11)
     assert np.allclose(probabilities.sum(axis=1), 1.0, atol=1e-5)
