@@ -1,5 +1,6 @@
 """Tests for Phase 11 LSTM architecture, training and inference."""
 from pathlib import Path
+import json
 import sys
 
 import joblib
