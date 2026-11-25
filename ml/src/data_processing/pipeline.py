@@ -6,7 +6,7 @@ import json
 import time
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from .cleaning import clean_text, normalize_text
+from src.nlp_preprocessing import preprocess_vietnamese_text
 from .categories import canonical_label, keyword_label
 from .readers import read_source
 
@@ -25,6 +25,9 @@ class ProcessingConfig:
     test_ratio: float = 0.15
     random_state: int = 42
     min_text_length: int = 3
+    remove_stopwords: bool = True
+    abbreviations_path: str | None = None
+    stopwords_path: str | None = None
 
 @dataclass
 class ProcessingResult:
@@ -82,8 +85,19 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
     label_col = _find_column(frame, config.label_column, LABEL_ALIASES, False)
     data = pd.DataFrame(index=frame.index)
     data["raw_content"] = frame[text_col].fillna("").astype(str)
-    data["cleaned_text"] = data["raw_content"].map(clean_text)
-    data["normalized_text"] = data["cleaned_text"].map(normalize_text)
+    nlp_results = data["raw_content"].map(
+        lambda value: preprocess_vietnamese_text(
+            value,
+            remove_stopwords_enabled=config.remove_stopwords,
+            abbreviations_path=config.abbreviations_path,
+            stopwords_path=config.stopwords_path,
+        )
+    )
+    data["cleaned_text"] = nlp_results.map(lambda result: result.raw_cleaned_text)
+    data["standardized_text"] = nlp_results.map(lambda result: result.standardized_text)
+    data["normalized_text"] = nlp_results.map(lambda result: result.normalized_text)
+    data["segmented_text"] = nlp_results.map(lambda result: result.segmented_text)
+    data["processed_text"] = nlp_results.map(lambda result: result.processed_text)
     data["source_file"] = Path(config.input_path).name
     data["source_label"] = frame[label_col].fillna("").astype(str) if label_col else ""
     rejected = data[data["normalized_text"].str.len() < config.min_text_length].copy()
@@ -107,15 +121,10 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
         if code:
             data.at[idx,"label_code"], data.at[idx,"label_name"], data.at[idx,"label_source"] = code, name, "source"
         elif config.use_keyword_rules:
-            code, name, source = keyword_label(row["cleaned_text"])
+            code, name, source = keyword_label(row["standardized_text"])
             if code:
                 data.at[idx,"label_code"], data.at[idx,"label_name"], data.at[idx,"label_source"] = code, name, source
     data["needs_review"] = data["label_code"].isna() | data["label_conflict"]
-    try:
-        from underthesea import word_tokenize
-        data["segmented_text"] = data["cleaned_text"].map(lambda s: word_tokenize(s, format="text") if s else "")
-    except ImportError as exc:
-        raise RuntimeError("Missing dependency underthesea. Install with: pip install -r ml/requirements.txt") from exc
     labeled = data[~data["needs_review"]].copy()
     review = data[data["needs_review"]].copy()
     train, validation, test = _split(labeled, config)
@@ -123,13 +132,13 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
         part["split"] = split_name
     output = Path(config.output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    columns = ["raw_content","cleaned_text","normalized_text","segmented_text","label_code","label_name","label_source","source_file","split","needs_review","label_conflict"]
+    columns = ["raw_content","cleaned_text","standardized_text","normalized_text","segmented_text","processed_text","label_code","label_name","label_source","source_file","split","needs_review","label_conflict"]
     for name, part in (("train.csv",train),("validation.csv",validation),("test.csv",test)):
         part.reindex(columns=columns).to_csv(output/name,index=False,encoding="utf-8-sig")
     review.reindex(columns=columns).to_csv(output/"needs_review.csv",index=False,encoding="utf-8-sig")
     labeled.reindex(columns=columns).to_csv(output/"labeled_all.csv",index=False,encoding="utf-8-sig")
-    duplicates.reindex(columns=["raw_content","cleaned_text","normalized_text","source_label","source_file"]).to_csv(output/"duplicates.csv",index=False,encoding="utf-8-sig")
-    rejected.reindex(columns=["raw_content","cleaned_text","normalized_text","source_label","source_file"]).to_csv(output/"rejected_rows.csv",index=False,encoding="utf-8-sig")
+    duplicates.reindex(columns=["raw_content","cleaned_text","standardized_text","normalized_text","source_label","source_file"]).to_csv(output/"duplicates.csv",index=False,encoding="utf-8-sig")
+    rejected.reindex(columns=["raw_content","cleaned_text","standardized_text","normalized_text","source_label","source_file"]).to_csv(output/"rejected_rows.csv",index=False,encoding="utf-8-sig")
     distribution = labeled.groupby(["label_code","label_name"],dropna=False).size().reset_index(name="count")
     distribution.to_csv(output/"label_distribution.csv",index=False,encoding="utf-8-sig")
     summary = {
@@ -145,7 +154,8 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
                  "Fuzzy duplicate removal is intentionally not enabled: similar reports may describe distinct incidents.",
                  "Keyword labels are weak labels and must be reviewed before being treated as ground truth.",
                  "Rows without a reliable label are excluded from model splits and exported to needs_review.csv.",
-                 "Splitting occurs after deduplication to prevent exact duplicate leakage across splits."]
+                 "Splitting occurs after abbreviation-aware deduplication to prevent exact duplicate leakage across splits.",
+                 "NLP preprocessing applies Unicode NFC, configured abbreviation expansion, Underthesea word segmentation and optional conservative stopword removal."]
     }
     (output/"dataset_summary.json").write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding="utf-8")
     return ProcessingResult(input_rows,len(data),len(duplicates),len(rejected),len(review),len(labeled),len(train),len(validation),len(test),str(output))
