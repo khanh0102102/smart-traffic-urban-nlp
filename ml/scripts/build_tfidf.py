@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--ngram-min", type=int, default=1)
     parser.add_argument("--ngram-max", type=int, default=2)
     parser.add_argument("--no-sublinear-tf", action="store_true")
+    parser.add_argument("--no-idf", action="store_true", help="Disable inverse document frequency weighting.")
     args = parser.parse_args()
 
     config = TfidfConfig(
@@ -39,6 +40,7 @@ def main() -> int:
         ngram_min=args.ngram_min,
         ngram_max=args.ngram_max,
         sublinear_tf=not args.no_sublinear_tf,
+        use_idf=not args.no_idf,
     )
     result = build_tfidf(config)
     print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
