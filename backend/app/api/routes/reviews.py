@@ -1,6 +1,7 @@
 """Staff review API for confirming or correcting AI prediction labels."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -110,6 +111,7 @@ def create_review(
         confirmed_category_id=confirmed_category.id,
         action=action,
         notes=payload.notes,
+        created_at=datetime.now(timezone.utc),
     )
     try:
         # Current final label changes, while every previous review remains in the audit history.
