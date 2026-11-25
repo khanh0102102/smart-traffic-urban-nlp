@@ -189,7 +189,7 @@ If the CSV already contains Phase 5 `processed_text`, skip preprocessing explici
 python ml/scripts/predict_naive_bayes.py --input ml/data/processed/test.csv --text-column processed_text --already-processed --output ml/artifacts/naive_bayes/test_predictions.csv
 ```
 
-Each prediction contains the category code/name, maximum class probability (`confidence`), processed text, and `has_known_features`. If no input token is present in the training TF-IDF vocabulary, the model still returns a prior-based prediction but sets `has_known_features=false` and adds a warning; treat that prediction as unreliable.
+Each prediction contains the category code/name, maximum class probability (`confidence`), processed text, and `has_known_features`. The probability is a model score, not a guarantee or necessarily a calibrated confidence. If no input token is present in the training TF-IDF vocabulary, the model still returns a prior-based prediction but sets `has_known_features=false` and adds a warning; treat that prediction as unreliable.
 
 ### Evaluation and saved artifacts
 
