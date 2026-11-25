@@ -171,7 +171,7 @@ def test_svm_validates_hyperparameters():
 def test_svm_rejects_isotonic_calibration_for_small_dataset(tmp_path):
     tfidf_dir = tmp_path / "tfidf"
     _prepare_tfidf_artifacts(tfidf_dir)
-    with pytest.raises(ValueError, match="3000 total"):
+    with pytest.raises(ValueError, match="1000"):
         train_svm(SVMConfig(
             tfidf_dir=str(tfidf_dir),
             output_dir=str(tmp_path / "out"),
