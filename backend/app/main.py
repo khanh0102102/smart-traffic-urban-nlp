@@ -12,6 +12,7 @@ from app.api.routes.reports import router as reports_router
 from app.api.routes.predictions import router as predictions_router
 from app.api.routes.reviews import router as reviews_router
 from app.api.routes.dashboard import router as dashboard_router
+from app.api.routes.ml_management import router as ml_management_router
 from app.core.config import settings
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -19,7 +20,7 @@ FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.7.0",
+    version="0.8.0",
     description="Backend API for the Smart Traffic & Urban Incident Classifier.",
 )
 
@@ -27,7 +28,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -40,6 +41,7 @@ app.include_router(reports_router, prefix="/api/v1")
 app.include_router(predictions_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(ml_management_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)
