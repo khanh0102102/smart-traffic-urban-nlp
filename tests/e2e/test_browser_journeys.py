@@ -220,21 +220,28 @@ def test_citizen_submits_report_and_staff_confirms_prediction(tmp_path, monkeypa
             try:
                 citizen_context = browser.new_context()
                 citizen_context.route("**/*", lambda route: _route_browser_assets(route, base_url))
-                citizen_context.add_init_script(
-                    "sessionStorage.setItem('stnlp.citizen.access_token', "
-                    + json.dumps(citizen_token)
-                    + "); sessionStorage.setItem('stnlp.citizen.user', "
-                    + json.dumps({
-                        "id": str(citizen.id),
-                        "email": citizen.email,
-                        "full_name": citizen.full_name,
-                        "role": citizen.role,
-                    })
-                    + ");"
-                )
                 citizen_page = citizen_context.new_page()
                 citizen_page.goto(base_url + "/citizen/", wait_until="domcontentloaded")
-                expect(citizen_page.locator("#fields")).to_be_enabled(timeout=10000)
+                citizen_page.evaluate(
+                    """(session) => {
+                      sessionStorage.setItem("stnlp.citizen.access_token", session.access_token);
+                      sessionStorage.setItem("stnlp.citizen.user", JSON.stringify(session.user));
+                    }""",
+                    {
+                        "access_token": citizen_token,
+                        "user": {
+                            "id": str(citizen.id),
+                            "email": citizen.email,
+                            "full_name": citizen.full_name,
+                            "role": citizen.role,
+                        },
+                    },
+                )
+                citizen_page.reload(wait_until="domcontentloaded")
+                expect(citizen_page.locator("#auth-notice")).to_contain_text(
+                    "Xin chào", timeout=10000,
+                )
+                expect(citizen_page.locator("#content")).to_be_enabled(timeout=10000)
                 citizen_page.locator("#content").fill(
                     "Đường Nguyễn Huệ có ổ gà sâu, gây nguy hiểm cho người đi xe máy."
                 )
