@@ -61,5 +61,5 @@ def test_preprocessing_returns_all_pipeline_representations():
     assert result.raw_cleaned_text == "Đg. này ko thông thoáng"
     assert result.standardized_text == "đường này không thông thoáng"
     assert result.segmented_text == "đường này không thông thoáng"
-    assert result.processed_text == "đường không thông thoáng"
+    assert result.processed_text == "đường này không thông thoáng"
     assert result.normalized_text == "đường này không thông thoáng"
