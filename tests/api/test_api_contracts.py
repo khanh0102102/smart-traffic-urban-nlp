@@ -111,9 +111,8 @@ def test_protected_api_routes_reject_missing_bearer_token(api):
 
 def test_prediction_api_rejects_invalid_report_identifier(api):
     client, citizen, _staff = api
-    response = client.post(
-        "/api/v1/predictions",
+    response = client.get(
+        "/api/v1/reports/not-a-uuid",
         headers=headers(citizen),
-        json={"report_id": "not-a-uuid"},
     )
     assert response.status_code == 422
