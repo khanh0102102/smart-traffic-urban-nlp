@@ -104,6 +104,10 @@ def _ensure_model_version(db: Session, predictor: ModelPredictor) -> ModelVersio
         "selection_value": meta.get("selection_value"),
         "confidence_threshold": meta.get("confidence_threshold"),
         "probability_calibrated": calibration,
+        "preprocessing_pipeline_version": PREPROCESSING_PIPELINE_VERSION,
+        "preprocessing_remove_stopwords": bool(
+            predictor.bundle.get("preprocessing", {}).get("remove_stopwords", True)
+        ),
         "bundle_sha256": digest,
     }
 
