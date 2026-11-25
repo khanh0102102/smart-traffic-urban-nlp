@@ -194,6 +194,8 @@ def test_prediction_persists_preprocessing_and_model_output(client, db_session, 
     assert model_version is not None
     assert model_version.algorithm == "NAIVE_BAYES"
     assert model_version.representation == "TF_IDF"
+    assert model_version.parameters["preprocessing_pipeline_version"] == "phase5-v1"
+    assert model_version.parameters["preprocessing_remove_stopwords"] is True
 
 
 def test_uncalibrated_svm_is_saved_without_fabricating_confidence(

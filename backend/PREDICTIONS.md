@@ -36,7 +36,7 @@ All paths are under `/api/v1`. Send `Authorization: Bearer <access_token>` to ev
 | GET | `/predictions/{prediction_id}` | Report owner or staff | Retrieve one stored prediction |
 | GET | `/predictions/report/{report_id}` | Report owner or staff | Retrieve prediction history for a report |
 
-A citizen can classify only their own report. `ADMIN` and `RECEIVER` can classify and inspect any report. The client sends only `report_id`; the classifier always reads `raw_content` from the database, not caller-supplied text. Each request creates a new immutable inference-history row; it does not overwrite `reports.final_category_id`, which remains the staff-confirmed category.
+A citizen can classify only their own report. `ADMIN` and `RECEIVER` can classify and inspect any report. The client sends only `report_id`; the classifier always reads `raw_content` from the database, not caller-supplied text. Each request creates a new immutable inference-history row; it does not overwrite `reports.final_category_id`, which remains the staff-confirmed category. The model-version record also stores the preprocessing pipeline version and stopword configuration used for reproducibility.
 
 ### Run a prediction
 
@@ -71,7 +71,7 @@ A result marked `needs_review=true` must be checked by a staff member. The selec
 
 ## Persistence and migration
 
-The module reuses the existing `preprocessing_runs`, `predictions`, `model_versions`, and `incident_categories` tables. It does not add a table. Migration `20261125_0002`:
+The module reuses the existing `preprocessing_runs`, `predictions`, `model_versions`, and `incident_categories` tables. It does not add a table. Staff may optionally pass both `dataset_id` and `dataset_split` when submitting a review. That atomically materializes the confirmed report as a verified `dataset_samples` row. Later reviews refresh that linked sample's confirmed label while every `prediction_reviews` decision remains in append-only history. Migration `20261125_0002`:
 - makes `predictions.confidence` nullable so an uncalibrated SVM is represented honestly;
 - adds `confidence_type`, `probability_calibrated`, `decision_margin`, and `review_reasons` for reproducibility and review traceability.
 

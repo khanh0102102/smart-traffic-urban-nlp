@@ -339,6 +339,66 @@ def test_training_run_lifecycle_and_metric_management(client, db_session):
     assert listed.json()["total"] == 1
 
 
+
+def test_training_run_requires_verified_train_sample(client, db_session):
+    data = setup_users_and_categories(db_session)
+    headers = auth_headers(data["staff"])
+    dataset = create_dataset(client, headers).json()
+
+    unverified = client.post(
+        f"/api/v1/ml/datasets/{dataset['id']}/samples",
+        headers=headers,
+        json={
+            "items": [
+                {
+                    "raw_text": "Phản ánh chưa được nhân viên xác minh.",
+                    "category_code": "R01",
+                    "split": "TRAIN",
+                    "is_verified": False,
+                }
+            ]
+        },
+    )
+    assert unverified.status_code == 201
+    rejected = client.post(
+        "/api/v1/ml/training-runs",
+        headers=headers,
+        json={
+            "dataset_id": dataset["id"],
+            "algorithm": "NAIVE_BAYES",
+            "representation": "TF_IDF",
+        },
+    )
+    assert rejected.status_code == 422
+    assert "verified TRAIN" in rejected.json()["detail"]
+
+    verified = client.post(
+        f"/api/v1/ml/datasets/{dataset['id']}/samples",
+        headers=headers,
+        json={
+            "items": [
+                {
+                    "raw_text": "Phản ánh đã được nhân viên xác minh.",
+                    "category_code": "R01",
+                    "split": "TRAIN",
+                    "is_verified": True,
+                }
+            ]
+        },
+    )
+    assert verified.status_code == 201
+    accepted = client.post(
+        "/api/v1/ml/training-runs",
+        headers=headers,
+        json={
+            "dataset_id": dataset["id"],
+            "algorithm": "NAIVE_BAYES",
+            "representation": "TF_IDF",
+        },
+    )
+    assert accepted.status_code == 201, accepted.text
+
+
 def test_training_requires_train_samples_and_dataset_delete_is_protected(client, db_session):
     data = setup_users_and_categories(db_session)
     headers = auth_headers(data["staff"])
@@ -372,6 +432,69 @@ def test_training_requires_train_samples_and_dataset_delete_is_protected(client,
         headers=headers,
     )
     assert blocked.status_code == 409
+
+
+
+def test_training_run_rejects_incompatible_model_version_and_links_matching_one(client, db_session):
+    data = setup_users_and_categories(db_session)
+    headers = auth_headers(data["staff"])
+    dataset = create_dataset(client, headers).json()
+    add_samples(client, headers, dataset["id"])
+
+    run = client.post(
+        "/api/v1/ml/training-runs",
+        headers=headers,
+        json={
+            "dataset_id": dataset["id"],
+            "algorithm": "SVM",
+            "representation": "TF_IDF",
+        },
+    )
+    assert run.status_code == 201, run.text
+    run_id = run.json()["id"]
+    started = client.patch(
+        f"/api/v1/ml/training-runs/{run_id}/status",
+        headers=headers,
+        json={"status": "RUNNING"},
+    )
+    assert started.status_code == 200
+
+    incompatible = ModelVersion(
+        name="ST-NLP CNN",
+        version=f"test-{uuid4().hex[:8]}",
+        algorithm="CNN",
+        representation="WORD_EMBEDDING",
+        artifact_path="test/cnn-bundle.joblib",
+        parameters={"fixture": True},
+        is_active=False,
+    )
+    compatible = ModelVersion(
+        name="ST-NLP SVM",
+        version=f"test-{uuid4().hex[:8]}",
+        algorithm="SVM",
+        representation="TF_IDF",
+        artifact_path="test/svm-bundle.joblib",
+        parameters={"fixture": True},
+        is_active=True,
+    )
+    db_session.add_all([incompatible, compatible])
+    db_session.commit()
+
+    rejected = client.patch(
+        f"/api/v1/ml/training-runs/{run_id}/status",
+        headers=headers,
+        json={"status": "COMPLETED", "model_version_id": str(incompatible.id)},
+    )
+    assert rejected.status_code == 422
+    assert "must match" in rejected.json()["detail"]
+
+    completed = client.patch(
+        f"/api/v1/ml/training-runs/{run_id}/status",
+        headers=headers,
+        json={"status": "COMPLETED", "model_version_id": str(compatible.id)},
+    )
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["model_version_id"] == str(compatible.id)
 
 
 def test_training_metrics_validate_class_label_and_range(client, db_session):

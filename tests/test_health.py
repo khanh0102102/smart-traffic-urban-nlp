@@ -10,7 +10,7 @@ def test_health_endpoint_returns_ok():
     assert response.json() == {
         "status": "ok",
         "application": "ST-NLP",
-        "phase": "22-frontend-backend-integration",
+        "phase": "23-ai-database-integration",
     }
 
 

@@ -416,13 +416,14 @@ def create_training_run(
     _current_user: User = Depends(require_roles("ADMIN", "RECEIVER")),
     db: Session = Depends(get_db),
 ):
-    """Register a pending training job for a dataset with at least one TRAIN sample."""
+    """Register a training job only when verified ground-truth TRAIN samples exist."""
     _get_dataset_or_404(db, payload.dataset_id)
     train_count = int(
         db.scalar(
             select(func.count(DatasetSample.id)).where(
                 DatasetSample.dataset_id == payload.dataset_id,
                 DatasetSample.split == "TRAIN",
+                DatasetSample.is_verified.is_(True),
             )
         )
         or 0
@@ -430,7 +431,7 @@ def create_training_run(
     if train_count == 0:
         raise HTTPException(
             status_code=422,
-            detail="The dataset must contain at least one TRAIN sample before training.",
+            detail="The dataset must contain at least one verified TRAIN sample before training.",
         )
     run = TrainingRun(
         dataset_id=payload.dataset_id,
@@ -514,8 +515,20 @@ def update_training_run_status(
 
     values = payload.model_dump(exclude_unset=True)
     if "model_version_id" in values and values["model_version_id"] is not None:
-        if db.get(ModelVersion, values["model_version_id"]) is None:
+        model_version = db.get(ModelVersion, values["model_version_id"])
+        if model_version is None:
             raise HTTPException(status_code=422, detail="model_version_id does not exist.")
+        if (
+            model_version.algorithm != run.algorithm
+            or model_version.representation != run.representation
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "model_version algorithm and representation must match "
+                    "the training run."
+                ),
+            )
     run.status = payload.status
     if payload.status == "RUNNING" and run.started_at is None:
         run.started_at = datetime.now(timezone.utc)
