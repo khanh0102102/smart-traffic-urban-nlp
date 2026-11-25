@@ -7,7 +7,7 @@ R01-R11 taxonomy, so class-to-index mappings remain stable across datasets.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -343,7 +343,7 @@ def build_embedding_data(config: EmbeddingConfig | None = None) -> EmbeddingResu
         "layer": "tensorflow.keras.layers.Embedding",
         "input_dim": tokenizer.vocab_size,
         "output_dim": config.embedding_dim,
-        "input_length": config.max_length,
+        "sequence_length": config.max_length,
         "mask_zero": config.mask_zero,
         "padding_index": PAD_INDEX,
         "oov_index": OOV_INDEX,
@@ -357,6 +357,9 @@ def build_embedding_data(config: EmbeddingConfig | None = None) -> EmbeddingResu
         "tokenizer_fit_source": "train.csv only",
         "validation_test_behavior": "transform with train vocabulary; unseen tokens map to OOV index 1",
         "vocabulary_size_including_special_tokens": tokenizer.vocab_size,
+        "max_vocab_size": config.max_vocab_size,
+        "min_frequency": config.min_frequency,
+        "lowercase": config.lowercase,
         "special_tokens": {PAD_TOKEN: PAD_INDEX, OOV_TOKEN: OOV_INDEX},
         "sequence_length": config.max_length,
         "padding": config.padding,
