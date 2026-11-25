@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class PredictionCreate(BaseModel):
@@ -52,7 +52,7 @@ class PredictionRead(BaseModel):
     decision_margin: Decimal | None
     class_probabilities: dict[str, float] | None
     needs_review: bool
-    review_reasons: list[str] = Field(default_factory=list)
+    review_reasons: list[str] | None = None
     inference_time_ms: int | None
-    preprocessing: PredictionPreprocessingRead
+    preprocessing: PredictionPreprocessingRead | None
     created_at: datetime
