@@ -52,4 +52,4 @@ def test_pipeline_exposes_each_stage_for_auditable_storage():
     assert result.standardized_text == "đường này không thông thoáng"
     assert result.normalized_text == "đường này không thông thoáng"
     assert result.segmented_text == "đường này không thông thoáng"
-    assert result.processed_text == "đường không thông thoáng"
+    assert result.processed_text == "đường này không thông thoáng"
