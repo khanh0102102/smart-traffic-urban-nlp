@@ -476,11 +476,13 @@ To evaluate only the final test split:
 python ml/scripts/evaluate_models.py --splits test
 ```
 
-To require prediction files from all four models (otherwise missing model directories are listed as skipped):
+By default, the evaluator requires prediction files from all four models for every requested split. For an intentional partial diagnostic run only, use:
 
 ```powershell
-python ml/scripts/evaluate_models.py --require-all-models
+python ml/scripts/evaluate_models.py --allow-missing-models
 ```
+
+A partial run is not a complete four-model comparison; inspect `skipped_models` in the JSON summary before using its results.
 
 Custom artifact directories can be supplied with `--naive-bayes-dir`, `--svm-dir`, `--cnn-dir`, and `--lstm-dir`; use `--output` to change the report directory.
 
@@ -488,7 +490,9 @@ Custom artifact directories can be supplied with `--naive-bayes-dir`, `--svm-dir
 
 - The evaluator consumes each model's saved prediction CSV; it never trains or tunes a model.
 - All scores use the complete fixed R01–R11 label list and `zero_division=0`, so classes missing from a small split remain visible in reports and confusion matrices.
+- By default, all four models must provide every requested split. Use `--allow-missing-models` only for a partial diagnostic run.
 - Models are compared only when their row_index and actual_label_code sequences match within the same split. This prevents misleading comparisons across different test examples.
+- The 60% confidence threshold is reported as a manual-review signal only. It does not remove examples or alter Accuracy/Precision/Recall/F1; uncalibrated SVM NaN confidence is excluded from confidence summaries.
 - Validation metrics are for model selection. Test metrics are the final holdout and should not be used repeatedly for tuning.
 - Macro F1 gives each category equal weight; Weighted F1 accounts for the number of actual examples in each category. Report both because the dataset may be imbalanced.
 
@@ -498,7 +502,9 @@ Reports are written under `ml/artifacts/evaluation/`:
 - `model_comparison.csv`: one row per model and split, including Accuracy, Macro and Weighted Precision/Recall/F1.
 - `classification_report_<model>_<split>.csv`: per-category Precision, Recall, F1 and support.
 - `confusion_matrix_<model>_<split>.csv`: fixed 11×11 confusion matrix.
-- `errors_<model>_<split>.csv`: row indices and actual/predicted category codes for misclassified examples.
+- `confusion_matrix_normalized_<model>_<split>.csv`: row-normalized confusion matrix.
+- `errors_<model>_<split>.csv`: row indices and actual/predicted category codes/names for misclassified examples.
+- `confusion_pairs_<model>_<split>.csv`: most frequent off-diagonal category confusions.
 - `evaluation_summary.json`: taxonomy, metrics, skipped models and ranking by split.
 
 ### Run tests
