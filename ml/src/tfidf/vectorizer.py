@@ -14,7 +14,7 @@ from typing import Any
 import joblib
 import pandas as pd
 import sklearn
-from scipy.sparse import save_npz
+from scipy.sparse import csr_matrix, save_npz
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
@@ -140,12 +140,18 @@ def build_tfidf(config: TfidfConfig | None = None) -> TfidfResult:
             "contains usable segmented tokens and that min_df/max_df are not too restrictive."
         ) from exc
 
-    x_validation = vectorizer.transform(
-        validation[config.text_column].fillna("").astype(str).tolist()
-    ).tocsr()
-    x_test = vectorizer.transform(
-        test[config.text_column].fillna("").astype(str).tolist()
-    ).tocsr()
+    validation_texts = validation[config.text_column].fillna("").astype(str).tolist()
+    test_texts = test[config.text_column].fillna("").astype(str).tolist()
+    # scikit-learn rejects transform([]); preserve a valid zero-row sparse matrix
+    # when Phase 4 has no validation or test examples in a tiny dataset.
+    x_validation = (
+        vectorizer.transform(validation_texts).tocsr()
+        if validation_texts else csr_matrix((0, x_train.shape[1]), dtype=x_train.dtype)
+    )
+    x_test = (
+        vectorizer.transform(test_texts).tocsr()
+        if test_texts else csr_matrix((0, x_train.shape[1]), dtype=x_train.dtype)
+    )
 
     output = Path(config.output_dir)
     output.mkdir(parents=True, exist_ok=True)
