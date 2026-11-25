@@ -7,7 +7,7 @@ client = TestClient(app)
 def test_health_endpoint_returns_ok():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "application": "ST-NLP", "phase": "20-citizen-frontend"}
+    assert response.json() == {"status": "ok", "application": "ST-NLP", "phase": "21-admin-frontend"}
 
 
 def test_citizen_portal_is_served():
@@ -21,7 +21,22 @@ def test_citizen_portal_is_served():
 def test_admin_portal_is_served_separately():
     response = client.get("/admin/")
     assert response.status_code == 200
-    assert "Cổng quản trị" in response.text
+    assert "Đăng nhập quản trị" in response.text
+    assert 'id="login-form"' in response.text
+    assert 'id="dashboard-view"' in response.text
+    assert 'id="reports-view"' in response.text
+    assert 'id="map-view"' in response.text
+    assert 'id="detail-overlay"' in response.text
+
+
+def test_admin_frontend_assets_are_available():
+    css = client.get("/assets/css/admin.css")
+    js = client.get("/assets/js/admin.js")
+    assert css.status_code == 200
+    assert ".sidebar" in css.text
+    assert js.status_code == 200
+    assert "auth/staff/login" in js.text
+    assert "dashboard/summary" in js.text
 
 
 def test_database_health_returns_connected_when_query_succeeds(monkeypatch):
