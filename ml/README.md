@@ -297,3 +297,80 @@ python -m pytest ml/tests/test_svm.py -q
 - Keyword labels are weak supervision, not verified ground truth. Review them before model training or evaluation.
 - At least three labeled unique rows are required to generate non-empty train/validation/test sets.
 - Keep real citizen data private; raw input files and generated processed data are ignored by Git.
+
+
+## Phase 10 – 1D CNN text classification
+
+Phase 10 adds a trainable 1D TextCNN using the padded integer sequences from Phase 7. It does not use the TF-IDF matrices from Phase 6. The network has a trainable Embedding layer, parallel Conv1D branches (default kernel sizes 3, 4 and 5), padding-aware global max pooling, a Dense/Dropout classifier and an 11-unit softmax output for R01–R11.
+
+### Install the optional neural-network dependency
+
+TensorFlow is deliberately kept separate from the base ML requirements so that Phases 4–9 do not need to install it:
+
+```powershell
+python -m pip install -r ml/requirements-embedding.txt
+```
+
+### Build Phase 7 sequences and train the CNN
+
+Run the data preparation and Phase 5 preprocessing first. Then build the sequence artifacts and train:
+
+```powershell
+python ml/scripts/build_embedding.py --dataset-dir ml/data/processed --output ml/artifacts/embedding
+python ml/scripts/train_cnn.py --embedding-dir ml/artifacts/embedding --output ml/artifacts/cnn
+```
+
+Default configuration: 20 epochs, batch size 32, 128 filters per convolution branch, kernel sizes 3/4/5, 128-dimensional Dense layer, 0.2 embedding spatial dropout, 0.4 classifier dropout, Adam learning rate 0.001 and balanced class weights. Early stopping monitors validation loss when the validation split is non-empty and restores the best weights. When validation is empty, training proceeds without validation-based early stopping.
+
+### Data separation and padding
+
+- The CNN reuses the tokenizer and fixed R01–R11 label encoder saved by Phase 7; it does not refit vocabulary or label IDs.
+- Model weights and class weights are learned from the training split only.
+- Validation is used only for early stopping and validation metrics. The test split is reserved for final evaluation.
+- A custom layer zeros the PAD embedding vectors before convolution, and masked global max pooling excludes token ID 0 positions. Token ID 1 remains the OOV token.
+- The reported maximum softmax score is a model confidence score, not a separately calibrated probability.
+
+### Predict a new report
+
+Raw Vietnamese text is passed through the saved Phase 5 preprocessing flow:
+
+```powershell
+python ml/scripts/predict_cnn.py --text "Đèn đường trước nhà bị hỏng nhiều ngày, buổi tối không có ánh sáng"
+```
+
+Predict a CSV file (default input column `content`):
+
+```powershell
+python ml/scripts/predict_cnn.py --input reports_to_classify.csv --text-column content --output cnn_predictions.csv
+```
+
+When the input CSV already contains Phase 5 `processed_text`, use `--already-processed` to skip preprocessing.
+
+### Generated artifacts
+
+- `cnn_model.keras`: trained Keras 1D CNN model.
+- `cnn_bundle.joblib`: fitted Phase 7 tokenizer, label encoder, model filename and inference metadata.
+- `training_history.csv`: per-epoch loss and accuracy values.
+- `predictions_validation.csv`, `predictions_test.csv`: actual/predicted category, confidence, known-token indicator and correctness.
+- `confusion_matrix_validation.csv`, `confusion_matrix_test.csv`: fixed R01–R11 confusion matrices.
+- `cnn_summary.json`: architecture, training parameters, split sizes, epoch count and evaluation metrics.
+
+Artifacts are written under `ml/artifacts/cnn/` and remain local because `ml/artifacts/*` is excluded from Git.
+
+### Tune the CNN
+
+```powershell
+python ml/scripts/train_cnn.py --embedding-dir ml/artifacts/embedding --output ml/artifacts/cnn --epochs 30 --batch-size 32 --filters 96 --kernel-sizes 3 4 5 --dropout 0.5 --learning-rate 0.0005 --patience 5
+```
+
+Use validation metrics to compare settings. Keep the test split as a final holdout and do not repeatedly tune against it.
+
+**Data limitation:** the included synthetic sample is for checking the pipeline, not for training a useful deep-learning classifier. CNNs need a substantially larger, manually reviewed dataset with representative examples for each incident category. If a category is absent from train, its output neuron receives no positive training examples and the model cannot learn that category reliably.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_cnn.py -q
+```
+
+The CNN tests are skipped automatically when TensorFlow is not installed.
