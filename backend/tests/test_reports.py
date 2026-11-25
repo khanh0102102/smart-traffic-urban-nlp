@@ -171,6 +171,21 @@ def test_staff_lists_reports_and_updates_status_and_category(client, db_session)
     assert updated.json()["status"] == "PROCESSING"
     assert updated.json()["category"]["code"] == "R01"
 
+    filtered = client.get(
+        "/api/v1/reports?category_code=R01",
+        headers=auth_headers(staff),
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+
+    cleared = client.patch(
+        f"/api/v1/reports/{report_id}/status",
+        headers=auth_headers(staff),
+        json={"status": "PROCESSING", "final_category_code": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["category"] is None
+
 
 def test_upload_image_and_download_is_owner_scoped(client, db_session):
     citizen = create_user(db_session, "image-owner@example.com", "CITIZEN")
