@@ -76,7 +76,7 @@ Sample listing supports `split`, `category_code`, `is_verified`, `page` and `pag
 | GET | `/training-runs/{run_id}` | Run details including metrics |
 | PATCH | `/training-runs/{run_id}/status` | Advance training lifecycle |
 
-A run may use algorithms `NAIVE_BAYES`, `SVM`, `CNN`, `LSTM`, `OTHER`; representations `TF_IDF`, `WORD_EMBEDDING`, `OTHER`. Creation requires at least one sample in the dataset's TRAIN split.
+A run may use algorithms `NAIVE_BAYES`, `SVM`, `CNN`, `LSTM`, `OTHER`; representations `TF_IDF`, `WORD_EMBEDDING`, `OTHER`. Creation requires at least one **verified** sample in the dataset's TRAIN split. A report can be enrolled directly from the staff review endpoint by passing both `dataset_id` and `dataset_split`; this creates or refreshes one verified sample per report and dataset.
 
 Allowed lifecycle:
 
@@ -136,4 +136,6 @@ Content-Type: application/json
 - No schema change, new table or migration is required.
 - Dataset deletion is blocked with HTTP 409 after a training run references it, preserving the existing foreign-key constraint.
 - Dataset/sample/run management is restricted to staff; citizens cannot access training data or model management.
+- A reviewed report may be synchronized into a selected dataset from `POST /api/v1/reviews` with `dataset_id` and `dataset_split` supplied together. The sample uses the report's original text, the preprocessing output used by the prediction (when available), and the staff-confirmed category.
+- Only verified TRAIN examples qualify a dataset for a new training run. If a `model_version_id` is attached to a run, its algorithm and representation must match the run.
 - Training metrics remain in the range supported by the current database check constraint (0–1); this endpoint is for scalar scores such as accuracy, precision, recall and F1, not raw confusion-matrix counts.
