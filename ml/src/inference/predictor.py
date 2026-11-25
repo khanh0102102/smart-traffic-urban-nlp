@@ -1,79 +1,138 @@
-"""Unified dispatch API over the four model-specific prediction functions."""
+"""Shared cached inference API for the selected ST-NLP classifier."""
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable
 import joblib
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import TfidfVectorizer
+from src.data_processing.categories import CATEGORIES
+from src.embedding import SequenceTokenizer, pad_sequences
 from src.inference.selection import MODEL_FILES, MODEL_NAMES
+from src.nlp_preprocessing import preprocess_vietnamese_text
 
 
 class ModelPredictor:
-    """One prediction interface regardless of the selected model architecture."""
-
+    """Load the packaged estimator once; reuse it for all calls to predict()."""
     def __init__(self, bundle_path="ml/artifacts/inference/best_model_bundle.joblib"):
-        self.bundle_path = Path(bundle_path)
-        if not self.bundle_path.is_file():
-            raise FileNotFoundError(
-                f"{self.bundle_path} not found. Run ml/scripts/build_inference.py first."
-            )
-        self.bundle = joblib.load(self.bundle_path)
-        if not isinstance(self.bundle, dict) or not isinstance(self.bundle.get("_inference"), dict):
-            raise ValueError("Invalid best_model_bundle.joblib format.")
-        self.metadata = self.bundle["_inference"]
-        self.model_key = self.metadata.get("selected_model")
-        if self.model_key not in MODEL_FILES:
-            raise ValueError("Inference bundle contains an unsupported selected_model.")
-        self.model_name = MODEL_NAMES[self.model_key]
-        self.threshold = float(self.metadata.get("confidence_threshold", 0.60))
-        if not 0 <= self.threshold <= 1:
-            raise ValueError("Invalid confidence threshold in inference bundle.")
-
-    def predict(self, texts: Iterable[object], *, already_processed: bool = False) -> list[dict[str, Any]]:
-        values = ["" if value is None else str(value) for value in texts]
-        if not values:
-            return []
-        if any(not value.strip() for value in values):
-            raise ValueError("Every report must contain non-empty text.")
-
-        path = str(self.bundle_path)
-        if self.model_key == "naive_bayes":
-            from src.naive_bayes.model import predict_reports
-            predictions = predict_reports(values, model_path=path, already_processed=already_processed)
-        elif self.model_key == "svm":
-            from src.svm.model import predict_svm_reports
-            predictions = predict_svm_reports(values, model_path=path, already_processed=already_processed)
-        elif self.model_key == "cnn":
-            from src.cnn.model import predict_cnn_reports
-            predictions = predict_cnn_reports(values, model_path=path, already_processed=already_processed)
+        self.path = Path(bundle_path)
+        if not self.path.is_file():
+            raise FileNotFoundError(f"{self.path} not found. Run ml/scripts/build_inference.py first.")
+        self.bundle = joblib.load(self.path)
+        self.meta = self.bundle.get("_inference", {})
+        self.key = self.meta.get("selected_model")
+        if self.key not in MODEL_FILES:
+            raise ValueError("Unsupported or invalid inference bundle.")
+        self.threshold = float(self.meta.get("confidence_threshold", .60))
+        self.encoder = self.bundle.get("label_encoder")
+        codes = np.asarray([c.code for c in CATEGORIES])
+        if not isinstance(self.encoder, LabelEncoder) or not np.array_equal(self.encoder.classes_, codes):
+            raise ValueError("Inference bundle must use canonical R01-R11 labels.")
+        self.names = {c.code: c.name for c in CATEGORIES}
+        self.model = self.bundle.get("model")
+        self.keras_model = None
+        if self.key in {"naive_bayes", "svm"}:
+            if not isinstance(self.bundle.get("vectorizer"), TfidfVectorizer) or self.model is None:
+                raise ValueError("Missing sklearn estimator or TF-IDF vectorizer.")
         else:
-            from src.lstm.model import predict_lstm_reports
-            predictions = predict_lstm_reports(values, model_path=path, already_processed=already_processed)
+            self._load_keras()
 
-        results = []
-        for row in predictions:
-            item = dict(row)
-            item["model_key"] = self.model_key
-            item["model_name"] = self.model_name
-            if "has_known_features" not in item:
-                item["has_known_features"] = bool(item.pop("has_known_tokens", True))
-            confidence = item.get("confidence")
-            if self.model_key == "svm":
-                calibrated = bool(item.get("probability_calibrated", False))
-                item["confidence_type"] = "calibrated_probability" if calibrated else "unavailable"
-            else:
-                calibrated = False if self.model_key in {"cnn", "lstm"} else None
-                item["confidence_type"] = "model_score"
-                item.setdefault("probability_calibrated", calibrated)
-            reasons = []
-            if not item["has_known_features"]:
-                reasons.append("No token from the report was found in the trained vocabulary.")
-            if confidence is None:
-                reasons.append("SVM probability calibration is unavailable; decision margin is not a probability.")
-            elif float(confidence) <= self.threshold:
-                reasons.append(f"Confidence is at or below the {self.threshold:.0%} manual-review threshold.")
-            if item.get("warning") and not reasons:
-                reasons.append(str(item["warning"]))
-            item["needs_manual_review"] = bool(reasons)
-            item["warning_reasons"] = reasons
-            item["confidence_threshold"] = self.threshold
-            results.append(item)
-        return results
+    def _load_keras(self):
+        try:
+            import tensorflow as tf
+        except ImportError as exc:
+            raise RuntimeError("Install TensorFlow using ml/requirements-embedding.txt for CNN/LSTM inference.") from exc
+        path = self.path.parent / str(self.bundle.get("model_file") or "")
+        if not path.is_file():
+            raise FileNotFoundError(f"Packaged Keras model missing: {path}")
+        if self.key == "cnn":
+            from src.cnn.model import _register_custom_layers
+            pool, zero = _register_custom_layers(tf)
+            self.keras_model = tf.keras.models.load_model(
+                path, custom_objects={"MaskedGlobalMaxPooling1D": pool, "ZeroPadEmbeddingOutput": zero},
+                compile=False)
+        else:
+            self.keras_model = tf.keras.models.load_model(path, compile=False)
+
+    def predict(self, texts: Iterable[object], *, already_processed=False) -> list[dict[str, Any]]:
+        raw = ["" if x is None else str(x) for x in texts]
+        if not raw:
+            return []
+        if any(not x.strip() for x in raw):
+            raise ValueError("Every report must contain non-empty text.")
+        if already_processed:
+            processed = raw
+        else:
+            remove = bool(self.bundle.get("preprocessing", {}).get("remove_stopwords", True))
+            processed = [preprocess_vietnamese_text(x, remove_stopwords_enabled=remove).processed_text for x in raw]
+        return self._tfidf(raw, processed) if self.key in {"naive_bayes", "svm"} else self._sequence(raw, processed)
+
+    def _result(self, raw, text, class_id, confidence, confidence_type, class_probs, known,
+                calibrated, margin=None):
+        code = str(self.encoder.inverse_transform([int(class_id)])[0])
+        reasons = []
+        if not known:
+            reasons.append("No token from this report was found in the trained vocabulary.")
+        if confidence is None:
+            reasons.append("SVM calibration is unavailable; decision margin is not a probability.")
+        elif confidence <= self.threshold:
+            reasons.append(f"Confidence is at or below the {self.threshold:.0%} manual-review threshold.")
+        return {
+            "raw_content": raw, "processed_text": text, "model_key": self.key,
+            "model_name": MODEL_NAMES[self.key], "predicted_label_code": code,
+            "predicted_label_name": self.names[code], "confidence": confidence,
+            "confidence_type": confidence_type, "probability_calibrated": calibrated,
+            "decision_margin": margin, "class_probabilities": class_probs,
+            "has_known_features": known, "needs_manual_review": bool(reasons),
+            "warning_reasons": reasons,
+        }
+
+    def _tfidf(self, raw, processed):
+        from sklearn.naive_bayes import MultinomialNB
+        from sklearn.svm import LinearSVC
+        from sklearn.calibration import CalibratedClassifierCV
+        matrix = self.bundle["vectorizer"].transform(processed).tocsr()
+        ids = self.model.predict(matrix).astype(int)
+        prob = None
+        margins = [None] * len(raw)
+        if self.key == "naive_bayes" or bool(self.bundle.get("probability_calibrated", False)):
+            prob = np.asarray(self.model.predict_proba(matrix), dtype=float)
+            classes = np.asarray(self.model.classes_, dtype=int)
+            kind = "model_score" if self.key == "naive_bayes" else "calibrated_probability"
+            calibrated = None if self.key == "naive_bayes" else True
+        else:
+            from src.svm.model import _decision_scores, _model_classes
+            classes = _model_classes(self.model)
+            score = _decision_scores(self.model, matrix)
+            positions = {int(v): i for i, v in enumerate(classes)}
+            margins = [float(score[i, positions[int(cid)]]) for i, cid in enumerate(ids)]
+            kind, calibrated = "unavailable", False
+        rows = []
+        for i, cid in enumerate(ids):
+            probs = None if prob is None else {
+                str(self.encoder.inverse_transform([int(k)])[0]): float(prob[i, j])
+                for j, k in enumerate(classes)}
+            conf = None if prob is None else float(prob[i].max())
+            rows.append(self._result(raw[i], processed[i], cid, conf, kind, probs,
+                                     bool(matrix[i].nnz), calibrated, margins[i]))
+        return rows
+
+    def _sequence(self, raw, processed):
+        tokenizer, cfg = self.bundle.get("tokenizer"), self.bundle.get("sequence")
+        if not isinstance(tokenizer, SequenceTokenizer) or not isinstance(cfg, dict):
+            raise ValueError("Neural bundle is missing tokenizer or sequence configuration.")
+        seq = tokenizer.texts_to_sequences(processed)
+        matrix = pad_sequences(seq, int(cfg["max_length"]),
+                               padding=cfg.get("padding", "post"),
+                               truncating=cfg.get("truncating", "post"))
+        probs = np.asarray(self.keras_model.predict(matrix, batch_size=256, verbose=0), dtype=float)
+        if probs.ndim != 2 or probs.shape[1] != len(self.encoder.classes_):
+            raise ValueError("Neural output does not match the canonical 11 categories.")
+        ids = probs.argmax(axis=1)
+        return [
+            self._result(raw[i], processed[i], int(cid), float(probs[i, cid]), "model_score",
+                         {str(self.encoder.inverse_transform([j])[0]): float(v)
+                          for j, v in enumerate(probs[i])},
+                         bool(np.any(matrix[i] > 1)), False)
+            for i, cid in enumerate(ids)
+        ]
