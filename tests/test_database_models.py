@@ -18,3 +18,10 @@ def test_models_have_expected_foreign_key_relationships():
     assert models.Prediction.__table__.c.model_version_id.foreign_keys
     assert models.PredictionReview.__table__.c.reviewer_user_id.foreign_keys
     assert models.TrainingMetric.__table__.c.training_run_id.foreign_keys
+
+
+def test_prediction_confidence_can_be_unavailable_for_uncalibrated_models():
+    assert models.Prediction.__table__.c.confidence.nullable is True
+    assert "confidence_type" in models.Prediction.__table__.c
+    assert "decision_margin" in models.Prediction.__table__.c
+    assert "probability_calibrated" in models.Prediction.__table__.c
