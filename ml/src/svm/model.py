@@ -161,14 +161,15 @@ def _fit_svm(
         )
         return base_estimator, False, None, reason
 
-    if config.calibration_method == "isotonic" and len(y_train) < 3000:
-        raise ValueError(
-            "Isotonic calibration is not recommended with fewer than 3000 total "
-            "training rows (the calibration fold would contain fewer than roughly "
-            "1000 rows with three-fold CV). Use sigmoid calibration or add data."
-        )
-
     cv_folds = min(config.calibration_cv, min_class_count)
+    if config.calibration_method == "isotonic" and (
+        min_class_count < 1000 or len(y_train) / cv_folds < 1000
+    ):
+        raise ValueError(
+            "Isotonic calibration needs at least 1000 training examples in every "
+            "class and roughly 1000 or more examples in each calibration fold. "
+            "Use sigmoid calibration or add data."
+        )
     calibrated = CalibratedClassifierCV(
         estimator=base_estimator,
         method=config.calibration_method,
