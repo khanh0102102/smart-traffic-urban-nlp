@@ -2,7 +2,7 @@
 
 ## Phase 4 – Data processing
 
-The pipeline reads CSV, TSV, Excel, JSON, JSONL and TXT files; cleans Vietnamese text; normalizes Unicode; removes exact duplicates; maps known labels to the canonical 11-category taxonomy; optionally creates weak keyword labels; tokenizes Vietnamese with Underthesea; and creates deterministic train/validation/test CSV files.
+The pipeline reads CSV, TSV, Excel, JSON, JSONL and TXT files; removes invalid rows and exact duplicates; maps known labels to the canonical 11-category taxonomy; optionally creates weak keyword labels; and creates deterministic train/validation/test CSV files. Vietnamese text preparation is described in Phase 5 below.
 
 ### Phase 5 – Vietnamese NLP preprocessing
 
