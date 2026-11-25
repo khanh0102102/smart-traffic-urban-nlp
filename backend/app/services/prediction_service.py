@@ -199,14 +199,28 @@ def execute_prediction(
         if decision_margin_value is not None
         else None
     )
+    if decision_margin is not None and not decision_margin.is_finite():
+        raise HTTPException(status_code=503, detail="The model returned an invalid decision margin.")
+
     class_probabilities = output.get("class_probabilities")
     if class_probabilities is not None:
         class_probabilities = {
             str(code): float(value)
             for code, value in class_probabilities.items()
         }
+        if any(not 0 <= value <= 1 for value in class_probabilities.values()):
+            raise HTTPException(status_code=503, detail="The model returned invalid class scores.")
 
-    reasons = [str(item) for item in output.get("warning_reasons", [])]
+    reasons = [str(item) for item in (output.get("warning_reasons") or [])]
+    confidence_type = str(output.get("confidence_type") or (
+        "unavailable" if confidence is None else "model_score"
+    ))
+    if confidence_type not in {"model_score", "calibrated_probability", "unavailable"}:
+        raise HTTPException(status_code=503, detail="The model returned an unsupported confidence type.")
+    if confidence is None and confidence_type != "unavailable":
+        confidence_type = "unavailable"
+    if confidence is not None and confidence_type == "unavailable":
+        raise HTTPException(status_code=503, detail="The model confidence metadata is inconsistent.")
     needs_review = bool(output.get("needs_manual_review", False)) or confidence is None
     if confidence is None and not reasons:
         reasons.append("The selected model does not provide a calibrated confidence probability.")
@@ -231,9 +245,7 @@ def execute_prediction(
             model_version_id=model_version.id,
             predicted_category_id=category.id,
             confidence=confidence,
-            confidence_type=str(output.get("confidence_type") or (
-                "unavailable" if confidence is None else "model_score"
-            )),
+            confidence_type=confidence_type,
             probability_calibrated=output.get("probability_calibrated"),
             decision_margin=decision_margin,
             class_probabilities=class_probabilities,
