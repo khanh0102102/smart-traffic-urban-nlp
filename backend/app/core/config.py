@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     report_max_upload_size_bytes: int = 5 * 1024 * 1024
     report_max_attachments: int = 5
 
+    # Phase 13's selected, packaged classifier built by ml/scripts/build_inference.py.
+    prediction_bundle_path: Path = PROJECT_ROOT / "ml" / "artifacts" / "inference" / "best_model_bundle.joblib"
+
     @property
     def report_storage_root(self) -> Path:
         """Resolve relative upload paths against the repository root, not the process CWD."""
