@@ -1,19 +1,70 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ST-NLP | Cổng quản trị</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <script defer src="/assets/js/app.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172f38">
+<title>ST-NLP | Quản trị hệ thống</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="/assets/css/style.css"><link rel="stylesheet" href="/assets/css/admin.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script defer src="/assets/js/admin.js"></script>
 </head>
-<body>
-  <main class="page">
-    <p class="eyebrow">SMART TRAFFIC & URBAN INCIDENT CLASSIFIER</p>
-    <h1>Cổng quản trị</h1>
-    <p>Đây là trang khởi tạo riêng cho quản trị viên. Các chức năng quản lý phản ánh và kiểm duyệt sẽ được triển khai ở giai đoạn tiếp theo.</p>
-    <span class="status" data-app-status>Project skeleton is ready</span>
-    <p class="portal-link"><a href="/citizen/">Đi tới cổng người dân</a></p>
+<body class="admin-body">
+<section id="login-screen" class="login-screen">
+  <div class="login-art"><a class="admin-brand" href="/admin/"><span class="admin-logo">ST</span><span>ST-NLP <b>CONTROL CENTER</b></span></a><div class="login-message"><p class="admin-eyebrow">SMART TRAFFIC &amp; URBAN INCIDENT CLASSIFIER</p><h1>Điều hành thông minh.<br><em>Đô thị tốt đẹp hơn.</em></h1><p>Không gian làm việc dành cho cán bộ tiếp nhận và quản trị hệ thống, hỗ trợ phân loại, kiểm duyệt và theo dõi phản ánh đô thị.</p><div class="login-art-note"><span>●</span> Hệ thống quản lý phản ánh đô thị</div></div><div class="login-ornament" aria-hidden="true">⌖</div></div>
+  <div class="login-panel"><div class="login-box"><p class="admin-eyebrow">STAFF AUTHENTICATION</p><h2>Đăng nhập quản trị</h2><p class="login-subtitle">Sử dụng tài khoản nhân viên được cấp bởi quản trị hệ thống.</p>
+    <form id="login-form"><label for="staff-email">Email công việc</label><input id="staff-email" type="email" autocomplete="username" placeholder="name@organization.gov.vn" required><label for="staff-password">Mật khẩu</label><div class="password-wrap"><input id="staff-password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" required><button type="button" id="toggle-password" aria-label="Hiện hoặc ẩn mật khẩu">◉</button></div><button id="login-button" class="admin-button admin-button-primary login-submit" type="submit">Đăng nhập <span>→</span></button><div id="login-message" class="admin-alert hidden" role="alert"></div></form>
+    <div class="login-security"><span>▣</span><p><b>Khu vực truy cập nội bộ</b><br>Chỉ tài khoản ADMIN và RECEIVER được phép truy cập. Không có chức năng đăng ký nhân viên công khai.</p></div><a class="back-citizen" href="/citizen/">← Quay về cổng người dân</a></div></div>
+</section>
+
+<div id="admin-app" class="admin-app hidden">
+<aside class="sidebar">
+  <a class="admin-brand sidebar-brand" href="/admin/"><span class="admin-logo">ST</span><span>ST-NLP <b>CONTROL CENTER</b></span></a>
+  <div class="sidebar-label">WORKSPACE</div>
+  <nav class="admin-nav">
+    <button class="nav-item active" data-view="dashboard-view"><span>▦</span>Tổng quan</button>
+    <button class="nav-item" data-view="reports-view"><span>▤</span>Quản lý phản ánh <i id="nav-pending">0</i></button>
+    <button class="nav-item" data-view="map-view"><span>⌖</span>Bản đồ sự việc</button>
+  </nav>
+  <div class="sidebar-bottom"><div class="sidebar-help"><span>?</span><div><b>Hướng dẫn nội bộ</b><small>Kiểm tra nội dung trước khi xác nhận nhãn.</small></div></div><a href="/citizen/" class="citizen-link">↗ Cổng người dân</a><div class="sidebar-version">ST-NLP ADMIN · v1.0</div></div>
+</aside>
+<div class="admin-main">
+  <header class="admin-topbar"><div><div class="breadcrumb">ST-NLP <span>/</span> <b id="page-breadcrumb">Tổng quan</b></div><h1 id="page-title">Tổng quan hệ thống</h1></div><div class="topbar-right"><button id="global-refresh" class="admin-icon-button" title="Làm mới dữ liệu">↻</button><div class="staff-profile"><span class="avatar" id="staff-avatar">A</span><div><b id="staff-name">Nhân viên</b><small id="staff-role">RECEIVER</small></div></div><button id="logout-button" class="admin-button admin-button-light">Đăng xuất</button></div></header>
+  <main class="admin-content">
+    <section id="dashboard-view" class="admin-view">
+      <div class="view-intro"><div><p class="admin-eyebrow">OPERATION OVERVIEW</p><h2>Bức tranh phản ánh đô thị</h2><p>Theo dõi tình hình tiếp nhận, phân loại và xử lý phản ánh.</p></div><div class="date-filters"><label>Từ ngày<input type="date" id="date-from"></label><label>Đến ngày<input type="date" id="date-to"></label><button id="apply-date" class="admin-button admin-button-primary">Áp dụng</button></div></div>
+      <div id="dashboard-alert" class="admin-alert hidden"></div>
+      <div class="metric-grid">
+        <article class="metric-card"><span class="metric-icon metric-green">▤</span><div><small>Tổng phản ánh</small><b id="metric-total">—</b><em>Tất cả phản ánh</em></div></article>
+        <article class="metric-card"><span class="metric-icon metric-blue">◉</span><div><small>Đã phân loại</small><b id="metric-classified">—</b><em id="metric-classified-rate">AI hoặc cán bộ</em></div></article>
+        <article class="metric-card"><span class="metric-icon metric-orange">◷</span><div><small>Chờ xử lý</small><b id="metric-pending">—</b><em>Đang tiếp nhận / xử lý</em></div></article>
+        <article class="metric-card"><span class="metric-icon metric-purple">⌖</span><div><small>Có vị trí bản đồ</small><b id="metric-geolocated">—</b><em>Đã ghi nhận tọa độ</em></div></article>
+      </div>
+      <div class="dashboard-grid">
+        <section class="admin-card category-card"><div class="card-heading"><div><h3>Phân bố 11 nhóm sự việc</h3><p>Số phản ánh theo danh mục phân loại</p></div><span class="card-tag">R01 – R11</span></div><div id="category-chart" class="category-chart"><div class="loading-line">Đang tải thống kê...</div></div></section>
+        <section class="admin-card status-card"><div class="card-heading"><div><h3>Trạng thái xử lý</h3><p>Tình hình quy trình tiếp nhận</p></div></div><div class="status-total"><b id="status-total">—</b><span>phản ánh</span></div><div id="status-chart" class="status-chart"></div><div id="status-legend" class="status-legend"></div><div class="completion-note"><span>✓</span><div><b id="resolved-total">—</b><small>Đã giải quyết</small></div></div></section>
+      </div>
+      <section class="admin-card recent-card"><div class="card-heading"><div><h3>Phản ánh mới nhất</h3><p>Các hồ sơ vừa được gửi lên hệ thống</p></div><button class="admin-text-button" data-go-reports>Xem tất cả →</button></div><div id="recent-reports" class="table-wrap"><div class="loading-line">Đang tải phản ánh...</div></div></section>
+    </section>
+
+    <section id="reports-view" class="admin-view hidden">
+      <div class="view-intro"><div><p class="admin-eyebrow">REPORT QUEUE</p><h2>Danh sách phản ánh</h2><p>Tìm kiếm, lọc trạng thái và mở hồ sơ để kiểm duyệt.</p></div><button id="reports-refresh" class="admin-button admin-button-light">↻ Làm mới</button></div>
+      <div class="filter-bar"><input id="search-filter" type="search" placeholder="Tìm nội dung hoặc mã phản ánh..."><select id="status-filter"><option value="">Tất cả trạng thái</option><option value="RECEIVED">Mới tiếp nhận</option><option value="PROCESSING">Đang xử lý</option><option value="RESOLVED">Đã giải quyết</option><option value="REJECTED">Từ chối</option></select><select id="category-filter"><option value="">Tất cả danh mục</option></select><button id="filter-submit" class="admin-button admin-button-primary">Lọc dữ liệu</button></div>
+      <section class="admin-card table-card"><div class="table-title"><div><h3>Hồ sơ phản ánh</h3><p id="reports-total">Đang tải dữ liệu...</p></div><span class="card-tag">CÓ PHÂN TRANG</span></div><div id="reports-table" class="table-wrap"><div class="loading-line">Đang tải...</div></div><div class="pagination"><span id="page-info">Trang 1</span><div><button id="page-prev" class="admin-button admin-button-light" disabled>← Trước</button><button id="page-next" class="admin-button admin-button-light" disabled>Tiếp →</button></div></div></section>
+    </section>
+
+    <section id="map-view" class="admin-view hidden">
+      <div class="view-intro"><div><p class="admin-eyebrow">GEOSPATIAL VIEW</p><h2>Bản đồ phản ánh</h2><p>Vị trí hiện trường của các phản ánh có tọa độ GPS.</p></div><button id="map-refresh" class="admin-button admin-button-light">↻ Tải lại điểm</button></div>
+      <div class="map-filters"><select id="map-status"><option value="">Mọi trạng thái</option><option value="RECEIVED">Mới tiếp nhận</option><option value="PROCESSING">Đang xử lý</option><option value="RESOLVED">Đã giải quyết</option><option value="REJECTED">Từ chối</option></select><select id="map-category"><option value="">Mọi danh mục</option></select><span id="map-count">Đang tải điểm bản đồ...</span></div>
+      <div class="admin-card admin-map-card"><div id="admin-map"></div><div class="map-footnote">● Mỗi điểm đánh dấu là một phản ánh có tọa độ. Chọn điểm để xem mã phản ánh và mở hồ sơ chi tiết.</div></div>
+    </section>
   </main>
-</body>
-</html>
+  <footer class="admin-footer"><span>ST-NLP · Smart Traffic &amp; Urban Incident Classifier</span><span>Dữ liệu cập nhật theo lần tải gần nhất</span></footer>
+</div>
+</div>
+
+<div id="detail-overlay" class="detail-overlay hidden" role="presentation">
+  <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+    <header class="detail-header"><div><p class="admin-eyebrow">REPORT CASE FILE</p><h2 id="detail-title">Chi tiết phản ánh</h2><span id="detail-tracking" class="tracking-badge">—</span></div><button id="detail-close" class="close-button" aria-label="Đóng">×</button></header>
+    <div id="detail-content" class="detail-content"><div class="loading-line">Đang tải hồ sơ...</div></div>
+  </section>
+</div>
+</body></html>

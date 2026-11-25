@@ -1,31 +1,50 @@
 # Frontend
 
-- Citizen portal: `/citizen/` (Phase 20).
-- Admin portal: `/admin/` (separate route and page; developed independently).
+The frontend contains two independent portal entry points:
 
-The citizen portal uses static HTML/CSS/JavaScript and existing FastAPI endpoints. No frontend build step is required.
+- Citizen portal: `/citizen/` (Google sign-in, report submission, map picker and AI result).
+- Admin portal: `/admin/` (staff login, dashboard, report queue, case review and map).
 
-## Google Sign-In setup
+The pages use static HTML/CSS/JavaScript and existing FastAPI endpoints. No frontend package installation or build step is required.
 
-1. Create an OAuth 2.0 Client ID of type **Web application** in Google Cloud Console.
-2. Add the exact local origin (for example `http://127.0.0.1:8000`) to Authorized JavaScript origins.
-3. Set the same client ID in backend `GOOGLE_CLIENT_ID`.
-4. Replace `YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com` in the `google-client-id` meta tag in `citizen/index.html`.
-5. Restart the backend and open `http://127.0.0.1:8000/citizen/`.
+## Admin portal
 
-Google Identity Services returns an ID token to the browser. The browser posts it to `POST /api/v1/auth/google`; the backend verifies signature, expiry, issuer and audience before issuing the ST-NLP JWT. Never expose a Google client secret or JWT signing secret in frontend code.
+Staff accounts are provisioned only from the trusted backend environment; there is no public staff registration route. See [Authentication – Staff provisioning](../backend/AUTHENTICATION.md).
 
-## Citizen workflow
+The Admin portal uses:
+- `POST /api/v1/auth/staff/login` and `GET /api/v1/auth/staff/me`.
+- `GET /api/v1/dashboard/summary` for status counters and all configured incident categories.
+- `GET /api/v1/reports` and `GET /api/v1/reports/{report_id}` for the report queue and details.
+- `GET /api/v1/predictions/report/{report_id}` for AI predictions.
+- `POST /api/v1/reviews` and `GET /api/v1/reviews/report/{report_id}` for confirmation/correction and audit history.
+- `PATCH /api/v1/reports/{report_id}/status` for the operational status.
+- `GET /api/v1/dashboard/map` for geolocated report markers.
+- `GET /api/v1/reports/{report_id}/attachments/{attachment_id}` to fetch protected image attachments using the staff bearer token.
 
-- Google login creates/resolves a CITIZEN account.
-- Submit text and optional address.
-- Choose a map point or use browser geolocation (permission required; geolocation requires HTTPS or localhost).
-- Preview/remove up to 5 JPEG, PNG or WebP images (5 MB each).
-- The portal creates the report, uploads images, then calls the prediction API.
-- Tracking codes and previous reports are loaded from `GET /api/v1/reports/mine`.
+The UI only permits ADMIN/RECEIVER sessions and the backend enforces the same roles on every API request. AI predictions remain immutable; review decisions append to `prediction_reviews` and the review API updates the report's official category.
 
-The report is persisted before inference. If the trained inference bundle is missing, the UI keeps the report and tracking code and displays the AI error; it never fabricates a prediction.
+## Run locally
 
-## Browser assets
+From the repository root:
 
-Google Identity Services, Leaflet 1.9.4, OpenStreetMap tiles and Be Vietnam Pro font are loaded from public CDNs. Map display needs internet access. Address is entered by the citizen; map clicks save latitude/longitude.
+```powershell
+Copy-Item .env.example .env
+# Configure DATABASE_URL/DB_* and a strong JWT_SECRET_KEY in .env.
+docker compose up -d postgres
+python -m pip install -r backend/requirements-dev.txt
+alembic upgrade head
+python scripts/seed_categories.py
+Push-Location backend
+python -m app.core.staff_provision --email admin@example.com --full-name "System Admin" --role ADMIN
+python -m app.core.staff_provision --email receiver@example.com --full-name "Report Receiver" --role RECEIVER
+Pop-Location
+uvicorn app.main:app --app-dir backend --reload
+```
+
+The staff provisioning command prompts for a password (minimum 12 characters). Open `http://127.0.0.1:8000/admin/`. Use the account email and password created by the provisioning command.
+
+The map uses Leaflet 1.9.4 and OpenStreetMap tiles from public CDNs and requires internet access. Map filters use only reports that contain both latitude and longitude. Detail attachments are fetched with the authenticated bearer token and rendered as local object URLs.
+
+## Google Sign-In for citizens
+
+Create an OAuth 2.0 Web Client ID, set `GOOGLE_CLIENT_ID` in backend `.env`, and update the `google-client-id` meta tag in `citizen/index.html`. Add the exact local origin to Authorized JavaScript origins. Never expose a Google client secret or JWT signing secret in frontend code.
