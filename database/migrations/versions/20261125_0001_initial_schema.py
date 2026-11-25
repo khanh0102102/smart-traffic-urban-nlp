@@ -30,7 +30,7 @@ def upgrade():
     op.create_table("incident_categories",
         sa.Column("id", UUID, primary_key=True), sa.Column("code", sa.String(3), nullable=False, unique=True),
         sa.Column("name", sa.String(160), nullable=False, unique=True), sa.Column("slug", sa.String(180), nullable=False, unique=True),
-        sa.Column("description", sa.Text()), sa.Column("sort_order", sa.Integer(), nullable=False, unique=True),
+        sa.Column("description", sa.Text()), sa.Column("sort_order", sa.Integer(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()), *audit_columns())
 
     op.create_table("model_versions",
