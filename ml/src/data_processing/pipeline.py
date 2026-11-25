@@ -85,13 +85,21 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
     data["source_label"] = frame[label_col].fillna("").astype(str) if label_col else ""
     rejected = data[data["normalized_text"].str.len() < config.min_text_length].copy()
     eligible = data[data["normalized_text"].str.len() >= config.min_text_length].copy()
+    # Conflicting labels on identical text are not silently trusted: keep one row for review.
+    eligible["_source_code"] = eligible["source_label"].map(lambda value: canonical_label(value)[0])
+    label_counts = eligible.groupby("normalized_text")["_source_code"].nunique()
+    conflicting_texts = set(label_counts[label_counts > 1].index)
     duplicate_mask = eligible.duplicated(subset=["normalized_text"], keep="first")
     duplicates = eligible[duplicate_mask].copy()
     data = eligible[~duplicate_mask].copy()
     data["label_code"] = None
     data["label_name"] = None
     data["label_source"] = "unlabeled"
+    data["label_conflict"] = data["normalized_text"].isin(conflicting_texts)
     for idx, row in data.iterrows():
+        if row["label_conflict"]:
+            data.at[idx,"label_source"] = "duplicate_label_conflict"
+            continue
         code, name = canonical_label(row["source_label"])
         if code:
             data.at[idx,"label_code"], data.at[idx,"label_name"], data.at[idx,"label_source"] = code, name, "source"
@@ -99,7 +107,7 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
             code, name, source = keyword_label(row["cleaned_text"])
             if code:
                 data.at[idx,"label_code"], data.at[idx,"label_name"], data.at[idx,"label_source"] = code, name, source
-    data["needs_review"] = data["label_code"].isna()
+    data["needs_review"] = data["label_code"].isna() | data["label_conflict"]
     try:
         from underthesea import word_tokenize
         data["segmented_text"] = data["cleaned_text"].map(lambda s: word_tokenize(s, format="text") if s else "")
@@ -112,7 +120,7 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
         part["split"] = split_name
     output = Path(config.output_dir)
     output.mkdir(parents=True, exist_ok=True)
-    columns = ["raw_content","cleaned_text","normalized_text","segmented_text","label_code","label_name","label_source","source_file","split","needs_review"]
+    columns = ["raw_content","cleaned_text","normalized_text","segmented_text","label_code","label_name","label_source","source_file","split","needs_review","label_conflict"]
     for name, part in (("train.csv",train),("validation.csv",validation),("test.csv",test)):
         part.reindex(columns=columns).to_csv(output/name,index=False,encoding="utf-8-sig")
     review.reindex(columns=columns).to_csv(output/"needs_review.csv",index=False,encoding="utf-8-sig")
@@ -123,6 +131,7 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
     distribution.to_csv(output/"label_distribution.csv",index=False,encoding="utf-8-sig")
     summary = {
         "input_file":str(config.input_path),"input_rows":input_rows,"valid_unique_rows":len(data),
+        "conflicting_duplicate_groups":len(conflicting_texts),
         "duplicate_rows":len(duplicates),"rejected_short_or_empty_rows":len(rejected),
         "labeled_rows":len(labeled),"needs_review_rows":len(review),
         "split_counts":{"train":len(train),"validation":len(validation),"test":len(test)},
