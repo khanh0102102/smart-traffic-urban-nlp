@@ -234,7 +234,7 @@ Default settings: `C=1.0`, `class_weight=balanced`, `max_iter=10000`, sigmoid pr
 
 - If every training class has at least two examples, the module calibrates SVM scores using stratified cross-validation on train only. The number of folds is lowered when needed to fit the smallest class count.
 - If any training class has only one example, SVM training continues without calibration. In that case, prediction outputs `confidence=null`, `probability_calibrated=false`, and a decision margin; a margin is not a probability.
-- Isotonic calibration is accepted only when every class has at least 1,000 training examples. For smaller datasets, use sigmoid calibration.
+- Isotonic calibration is accepted only when the training split contains at least 3,000 total rows, so a three-fold calibration holdout has roughly 1,000 rows or more. For smaller datasets, use sigmoid calibration.
 - Validation/test are never used to fit the SVM or the probability calibrator.
 
 ### Predict a new report
