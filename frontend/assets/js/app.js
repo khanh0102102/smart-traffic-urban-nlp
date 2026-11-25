@@ -2,7 +2,9 @@
 "use strict";
 const TOKEN="stnlp.citizen.access_token",USER="stnlp.citizen.user",MAX=5,MAX_SIZE=5*1024*1024;
 const $=s=>document.querySelector(s);
-window.localStorage.removeItem(TOKEN);window.localStorage.removeItem(USER);\nconst state={token:sessionStorage.getItem(TOKEN),user:null,images:[],lat:null,lng:null,map:null,marker:null,busy:false};\nconst apiClient=window.STNLPApi.createApiClient({baseURL:"/api/v1",timeout:30000,getToken:()=>sessionStorage.getItem(TOKEN),onUnauthorized:()=>logout(false)});
+window.localStorage.removeItem(TOKEN);window.localStorage.removeItem(USER);
+const state={token:sessionStorage.getItem(TOKEN),user:null,images:[],lat:null,lng:null,map:null,marker:null,busy:false};
+const apiClient=window.STNLPApi.createApiClient({baseURL:"/api/v1",timeout:30000,getToken:()=>sessionStorage.getItem(TOKEN),onUnauthorized:()=>logout(false)});
 const escapeHtml=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function message(text,type="success"){const el=$("#message");el.textContent=text;el.className="message "+type}
 function clearMessage(){$("#message").classList.add("hidden")}
