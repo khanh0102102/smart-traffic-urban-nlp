@@ -81,4 +81,3 @@ def test_database_health_returns_503_when_database_is_unavailable(monkeypatch):
     response = client.get("/api/v1/health/database")
     assert response.status_code == 503
     assert "Database is unavailable" in response.json()["detail"]
-}
