@@ -41,7 +41,8 @@ def verify_password(plain_password: str, password_hash: str | None) -> bool:
         return False
     try:
         return _password_hash.verify(plain_password, password_hash)
-    except (ValueError, TypeError):
+    except Exception:
+        # Malformed or unsupported stored hashes must fail closed, not produce a 500.
         return False
 
 
