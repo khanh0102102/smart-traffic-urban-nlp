@@ -127,6 +127,8 @@ embedding = create_embedding_layer(
 ```
 
 The layer starts with trainable random weights. Those weights are learned when the downstream model is trained; this phase prepares the layer configuration and integer inputs, not a pretrained embedding model.
+On native Windows, the optional TensorFlow package runs on CPU; TensorFlow GPU support for newer releases requires WSL2. See the [official TensorFlow installation guide](https://www.tensorflow.org/install/pip) before choosing a GPU setup.
+
 
 ### Generated artifacts
 
