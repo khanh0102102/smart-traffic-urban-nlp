@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping
+from functools import lru_cache
 
 from src.data_processing.cleaning import clean_text, normalize_text
 
@@ -33,6 +34,7 @@ def normalize_unicode(value: object) -> str:
     return unicodedata.normalize("NFC", clean_text(value))
 
 
+@lru_cache(maxsize=16)
 def load_abbreviations(path: str | Path | None = None) -> dict[str, str]:
     source = Path(path) if path else DEFAULT_ABBREVIATIONS_PATH
     payload = json.loads(source.read_text(encoding="utf-8-sig"))
@@ -75,6 +77,7 @@ def normalize_abbreviations(
     return unicodedata.normalize("NFC", re.sub(r"\s+", " ", text).strip())
 
 
+@lru_cache(maxsize=16)
 def load_stopwords(path: str | Path | None = None) -> set[str]:
     """Load one stopword per line; blank lines and # comments are ignored."""
     source = Path(path) if path else DEFAULT_STOPWORDS_PATH
