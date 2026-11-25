@@ -18,7 +18,7 @@ def read_source(path: str | Path) -> pd.DataFrame:
         except UnicodeDecodeError:
             return pd.read_csv(source, dtype=str, keep_default_na=False, encoding="cp1258")
     if suffix == ".tsv":
-        return pd.read_csv(source, sep="\\t", dtype=str, keep_default_na=False, encoding="utf-8-sig")
+        return pd.read_csv(source, sep="\t", dtype=str, keep_default_na=False, encoding="utf-8-sig")
     if suffix in {".xlsx", ".xls"}:
         return pd.read_excel(source, dtype=str).fillna("")
     if suffix == ".json":
