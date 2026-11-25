@@ -21,7 +21,7 @@ python scripts/seed_categories.py
 ```
 Wait until `stnlp-postgres` is healthy before running migrations. The default database is `stnlp` on port `5432`.
 
-## Phases 4–5 – Data processing and Vietnamese NLP preprocessing
+## Phases 4–6 – Data processing, Vietnamese NLP preprocessing and TF-IDF
 Install the ML dependencies and run the included sample. The pipeline cleans source text, applies Unicode NFC and abbreviation normalization, segments Vietnamese words, removes conservative stopwords, deduplicates, labels and splits the dataset:
 
 ```powershell
