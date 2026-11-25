@@ -31,6 +31,7 @@ class ProcessingResult:
     input_rows: int
     valid_rows: int
     duplicate_rows: int
+    rejected_rows: int
     review_rows: int
     labeled_rows: int
     train_rows: int
@@ -55,20 +56,19 @@ def _split(frame: pd.DataFrame, config: ProcessingConfig) -> tuple[pd.DataFrame,
     if frame.empty:
         empty = frame.copy()
         return empty, empty, empty
-    train_r, val_r, test_r = config.train_ratio, config.validation_ratio, config.test_ratio
-    if min(train_r,val_r,test_r) <= 0 or abs(train_r+val_r+test_r-1.0) > 1e-8:
+    ratios = (config.train_ratio,config.validation_ratio,config.test_ratio)
+    if min(ratios) <= 0 or abs(sum(ratios)-1.0) > 1e-8:
         raise ValueError("train_ratio, validation_ratio and test_ratio must be positive and sum to 1.")
-    y = frame["label_code"]
-    stratify = y if y.value_counts().min() >= 3 and y.nunique() > 1 else None
+    if len(frame) < 3:
+        raise ValueError("At least 3 labeled, unique records are required to create non-empty train/validation/test splits.")
+    stratify = frame["label_code"] if frame["label_code"].value_counts().min() >= 3 and frame["label_code"].nunique() > 1 else None
     try:
-        train, holdout = train_test_split(frame, test_size=val_r+test_r, random_state=config.random_state, stratify=stratify)
+        train, holdout = train_test_split(frame, test_size=config.validation_ratio+config.test_ratio, random_state=config.random_state, stratify=stratify)
         holdout_stratify = holdout["label_code"] if stratify is not None and holdout["label_code"].value_counts().min() >= 2 else None
-        val_fraction = val_r/(val_r+test_r)
-        validation, test = train_test_split(holdout, test_size=1-val_fraction, random_state=config.random_state, stratify=holdout_stratify)
+        validation, test = train_test_split(holdout, test_size=config.test_ratio/(config.validation_ratio+config.test_ratio), random_state=config.random_state, stratify=holdout_stratify)
     except ValueError:
-        # Small datasets cannot always be stratified; keep deterministic random splits.
-        train, holdout = train_test_split(frame, test_size=val_r+test_r, random_state=config.random_state, stratify=None)
-        validation, test = train_test_split(holdout, test_size=test_r/(val_r+test_r), random_state=config.random_state)
+        train, holdout = train_test_split(frame, test_size=config.validation_ratio+config.test_ratio, random_state=config.random_state)
+        validation, test = train_test_split(holdout, test_size=config.test_ratio/(config.validation_ratio+config.test_ratio), random_state=config.random_state)
     return train.copy(), validation.copy(), test.copy()
 
 def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
@@ -77,17 +77,17 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
     input_rows = len(frame)
     text_col = _find_column(frame, config.text_column, TEXT_ALIASES, True)
     label_col = _find_column(frame, config.label_column, LABEL_ALIASES, False)
-    data = pd.DataFrame()
-    data["raw_content"] = frame[text_col].astype(str)
+    data = pd.DataFrame(index=frame.index)
+    data["raw_content"] = frame[text_col].fillna("").astype(str)
     data["cleaned_text"] = data["raw_content"].map(clean_text)
     data["normalized_text"] = data["cleaned_text"].map(normalize_text)
     data["source_file"] = Path(config.input_path).name
-    if label_col:
-        data["source_label"] = frame[label_col].astype(str)
-    else:
-        data["source_label"] = ""
-    data = data[data["normalized_text"].str.len() >= config.min_text_length].copy()
-    data = data.drop_duplicates(subset=["normalized_text"], keep="first").copy()
+    data["source_label"] = frame[label_col].fillna("").astype(str) if label_col else ""
+    rejected = data[data["normalized_text"].str.len() < config.min_text_length].copy()
+    eligible = data[data["normalized_text"].str.len() >= config.min_text_length].copy()
+    duplicate_mask = eligible.duplicated(subset=["normalized_text"], keep="first")
+    duplicates = eligible[duplicate_mask].copy()
+    data = eligible[~duplicate_mask].copy()
     data["label_code"] = None
     data["label_name"] = None
     data["label_source"] = "unlabeled"
@@ -100,7 +100,11 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
             if code:
                 data.at[idx,"label_code"], data.at[idx,"label_name"], data.at[idx,"label_source"] = code, name, source
     data["needs_review"] = data["label_code"].isna()
-    data["segmented_text"] = data["cleaned_text"].map(lambda s: " ".join(__import__("underthesea").word_tokenize(s, format="text").split()) if s else "")
+    try:
+        from underthesea import word_tokenize
+        data["segmented_text"] = data["cleaned_text"].map(lambda s: word_tokenize(s, format="text") if s else "")
+    except ImportError as exc:
+        raise RuntimeError("Missing dependency underthesea. Install with: pip install -r ml/requirements.txt") from exc
     labeled = data[~data["needs_review"]].copy()
     review = data[data["needs_review"]].copy()
     train, validation, test = _split(labeled, config)
@@ -113,21 +117,23 @@ def run_pipeline(config: ProcessingConfig) -> ProcessingResult:
         part.reindex(columns=columns).to_csv(output/name,index=False,encoding="utf-8-sig")
     review.reindex(columns=columns).to_csv(output/"needs_review.csv",index=False,encoding="utf-8-sig")
     labeled.reindex(columns=columns).to_csv(output/"labeled_all.csv",index=False,encoding="utf-8-sig")
+    duplicates.reindex(columns=["raw_content","cleaned_text","normalized_text","source_label","source_file"]).to_csv(output/"duplicates.csv",index=False,encoding="utf-8-sig")
+    rejected.reindex(columns=["raw_content","cleaned_text","normalized_text","source_label","source_file"]).to_csv(output/"rejected_rows.csv",index=False,encoding="utf-8-sig")
     distribution = labeled.groupby(["label_code","label_name"],dropna=False).size().reset_index(name="count")
     distribution.to_csv(output/"label_distribution.csv",index=False,encoding="utf-8-sig")
     summary = {
-        "input_file": str(config.input_path), "input_rows": input_rows,
-        "valid_unique_rows": len(data), "duplicate_or_too_short_rows": input_rows-len(data),
-        "labeled_rows": len(labeled), "needs_review_rows": len(review),
-        "split_counts": {"train":len(train),"validation":len(validation),"test":len(test)},
-        "split_ratios": {"train":config.train_ratio,"validation":config.validation_ratio,"test":config.test_ratio},
-        "label_distribution": {str(k):int(v) for k,v in labeled["label_code"].value_counts().items()},
-        "random_state":config.random_state,
-        "processing_seconds":round(time.perf_counter()-started,3),
+        "input_file":str(config.input_path),"input_rows":input_rows,"valid_unique_rows":len(data),
+        "duplicate_rows":len(duplicates),"rejected_short_or_empty_rows":len(rejected),
+        "labeled_rows":len(labeled),"needs_review_rows":len(review),
+        "split_counts":{"train":len(train),"validation":len(validation),"test":len(test)},
+        "split_ratios":{"train":config.train_ratio,"validation":config.validation_ratio,"test":config.test_ratio},
+        "label_distribution":{str(k):int(v) for k,v in labeled["label_code"].value_counts().items()},
+        "random_state":config.random_state,"processing_seconds":round(time.perf_counter()-started,3),
         "notes":["Exact duplicate removal uses normalized Vietnamese text and keeps the first row.",
-                 "No fuzzy duplicate removal is performed to avoid deleting similar but distinct reports.",
+                 "Fuzzy duplicate removal is intentionally not enabled: similar reports may describe distinct incidents.",
+                 "Keyword labels are weak labels and must be reviewed before being treated as ground truth.",
                  "Rows without a reliable label are excluded from model splits and exported to needs_review.csv.",
-                 "Splitting occurs after deduplication to prevent duplicate leakage across splits."]
+                 "Splitting occurs after deduplication to prevent exact duplicate leakage across splits."]
     }
     (output/"dataset_summary.json").write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding="utf-8")
-    return ProcessingResult(input_rows,len(data),input_rows-len(data),len(review),len(labeled),len(train),len(validation),len(test),str(output))
+    return ProcessingResult(input_rows,len(data),len(duplicates),len(rejected),len(review),len(labeled),len(train),len(validation),len(test),str(output))
