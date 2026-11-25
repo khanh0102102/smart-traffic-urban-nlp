@@ -1,5 +1,7 @@
 """Canonical incident taxonomy shared with the Phase 3 database seed."""
 from dataclasses import dataclass
+import re
+import unicodedata
 
 @dataclass(frozen=True)
 class Category:
@@ -21,29 +23,26 @@ CATEGORIES = (
  Category("R10","Đỗ xe cản trở",("r10","do xe can tro","do xe trai phep"),("đỗ xe","dừng đỗ","đậu xe","đỗ xe trái phép","xe chắn lối","đỗ xe cản trở")),
  Category("R11","Khác",("r11","khac"),()),
 )
+def _key(value: object) -> str:
+    text=unicodedata.normalize("NFKD",str(value)).casefold()
+    text="".join(ch for ch in text if not unicodedata.combining(ch))
+    text=re.sub(r"[^a-z0-9]+"," ",text)
+    return " ".join(text.split())
 
 def canonical_label(value: object) -> tuple[str | None, str | None]:
     """Resolve an explicit source label to a canonical code/name."""
-    import re, unicodedata
     if value is None:
-        return None, None
-    text = unicodedata.normalize("NFKC", str(value)).strip().casefold()
-    text = re.sub(r"[_/\\-]+", " ", text)
-    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
-    text = " ".join(text.split())
+        return None,None
+    key=_key(value)
     for category in CATEGORIES:
-        candidates = (category.code.casefold(), category.name.casefold(), *category.aliases)
-        for candidate in candidates:
-            c = unicodedata.normalize("NFKD", candidate)
-            c = "".join(ch for ch in c if not unicodedata.combining(ch)).casefold()
-            if text == candidate.casefold() or text == c:
-                return category.code, category.name
-    return None, None
+        if key in {_key(x) for x in (category.code,category.name,*category.aliases)}:
+            return category.code,category.name
+    return None,None
 
 def keyword_label(text: str) -> tuple[str | None, str | None, str | None]:
     """Return a weak label only when exactly one category has keyword hits."""
-    folded = text.casefold()
-    hits = [c for c in CATEGORIES if c.keywords and any(k in folded for k in c.keywords)]
-    if len(hits) == 1:
-        return hits[0].code, hits[0].name, "keyword_rule"
-    return None, None, None
+    folded=text.casefold()
+    hits=[c for c in CATEGORIES if c.keywords and any(k in folded for k in c.keywords)]
+    if len(hits)==1:
+        return hits[0].code,hits[0].name,"keyword_rule"
+    return None,None,None
