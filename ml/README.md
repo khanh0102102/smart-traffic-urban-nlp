@@ -33,6 +33,7 @@ If your file has no label column, omit `--label-column`; unique, unambiguous key
 - Original text is retained in `raw_content`; cleaned/normalized/tokenized text is stored separately.
 - Vietnamese accents are preserved. Unicode is normalized to NFC.
 - Exact duplicates are removed before splitting to prevent train/test leakage. Similar but non-identical reports are not automatically removed.
+- If identical normalized text appears with conflicting source labels, the retained row is marked `duplicate_label_conflict` and sent to manual review.
 - Existing labels are accepted only when they map to R01–R11. Unrecognized labels are sent for review.
 - Keyword labels are weak supervision, not verified ground truth. Review them before model training or evaluation.
 - At least three labeled unique rows are required to generate non-empty train/validation/test sets.
