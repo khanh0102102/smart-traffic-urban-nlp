@@ -14,7 +14,8 @@ from src.tfidf import TfidfConfig, build_tfidf, load_tfidf_vectorizer
 def _write_split(path: Path, rows: list[tuple[str, str]]) -> None:
     pd.DataFrame(
         [{"processed_text": text, "label_code": label, "label_name": label}
-         for text, label in rows]
+         for text, label in rows],
+        columns=["processed_text", "label_code", "label_name"],
     ).to_csv(path, index=False, encoding="utf-8-sig")
 
 
