@@ -21,7 +21,7 @@ def test_keyword_label_only_when_unambiguous():
 
 def test_pipeline_deduplicates_and_exports_review_and_splits(tmp_path):
     source=tmp_path/"reports.csv"
-    source.write_text('content,category\\n"Đường có ổ gà nguy hiểm",R01\\n"Đường có ổ gà nguy hiểm!",R01\\n"Đèn đường bị hỏng",R02\\n"Rác thải gây mùi hôi",R09\\n"Phản ánh chưa rõ nhóm",\\n',encoding="utf-8")
+    source.write_text('content,category\n"Đường có ổ gà nguy hiểm",R01\n"Đường có ổ gà nguy hiểm!",R01\n"Đèn đường bị hỏng",R02\n"Rác thải gây mùi hôi",R09\n"Phản ánh chưa rõ nhóm",\n',encoding="utf-8")
     output=tmp_path/"out"
     result=run_pipeline(ProcessingConfig(input_path=str(source),output_dir=str(output),use_keyword_rules=False))
     assert result.input_rows == 5
@@ -32,4 +32,5 @@ def test_pipeline_deduplicates_and_exports_review_and_splits(tmp_path):
     assert (output/"validation.csv").exists()
     assert (output/"test.csv").exists()
     assert (output/"needs_review.csv").exists()
+    assert (output/"duplicates.csv").exists()
     assert (output/"dataset_summary.json").exists()
