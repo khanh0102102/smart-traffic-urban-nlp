@@ -9,7 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies import get_current_user, require_roles
-from app.database.models import IncidentCategory, Prediction, PredictionReview, Report, User
+from app.database.models import (
+    Dataset,
+    DatasetSample,
+    IncidentCategory,
+    Prediction,
+    PredictionReview,
+    Report,
+    User,
+)
 from app.database.session import get_db
 from app.schemas.reviews import ReviewCategoryRead, ReviewCreate, ReviewRead, ReviewUserRead
 
@@ -90,7 +98,11 @@ def create_review(
     prediction = db.scalar(
         select(Prediction)
         .where(Prediction.id == payload.prediction_id)
-        .options(joinedload(Prediction.report), joinedload(Prediction.predicted_category))
+        .options(
+            joinedload(Prediction.report),
+            joinedload(Prediction.predicted_category),
+            joinedload(Prediction.preprocessing_run),
+        )
     )
     if prediction is None:
         raise HTTPException(status_code=404, detail="Prediction not found.")
@@ -104,6 +116,12 @@ def create_review(
     if confirmed_category is None:
         raise HTTPException(status_code=422, detail="Unknown or inactive R01-R11 category code.")
 
+    target_dataset = None
+    if payload.dataset_id is not None:
+        target_dataset = db.get(Dataset, payload.dataset_id)
+        if target_dataset is None:
+            raise HTTPException(status_code=404, detail="Dataset not found.")
+
     action = "CONFIRMED" if confirmed_category.id == prediction.predicted_category_id else "CORRECTED"
     review = PredictionReview(
         prediction_id=prediction.id,
@@ -114,9 +132,45 @@ def create_review(
         created_at=datetime.now(timezone.utc),
     )
     try:
-        # Current final label changes, while every previous review remains in the audit history.
+        # The report keeps the latest staff-confirmed label; review rows remain append-only.
         prediction.report.final_category = confirmed_category
         db.add(review)
+
+        # A staff decision is verified ground truth. Refresh any dataset rows already
+        # materialized from this report so later corrections do not leave stale labels.
+        processed_text = (
+            prediction.preprocessing_run.stopwords_removed_text
+            if prediction.preprocessing_run is not None
+            else None
+        )
+        samples = db.scalars(
+            select(DatasetSample).where(DatasetSample.report_id == prediction.report_id)
+        ).all()
+        target_sample = None
+        for sample in samples:
+            sample.raw_text = prediction.report.raw_content
+            if processed_text is not None:
+                sample.processed_text = processed_text
+            sample.category_id = confirmed_category.id
+            sample.is_verified = True
+            if target_dataset is not None and sample.dataset_id == target_dataset.id:
+                target_sample = sample
+
+        if target_dataset is not None and target_sample is None:
+            db.add(
+                DatasetSample(
+                    dataset_id=target_dataset.id,
+                    report_id=prediction.report_id,
+                    raw_text=prediction.report.raw_content,
+                    processed_text=processed_text,
+                    category_id=confirmed_category.id,
+                    split=payload.dataset_split,
+                    is_verified=True,
+                )
+            )
+        elif target_sample is not None:
+            target_sample.split = payload.dataset_split
+
         db.flush()
         db.commit()
     except Exception as exc:
