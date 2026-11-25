@@ -68,7 +68,7 @@ Default settings use unigram + bigram features (`ngram_range=(1, 2)`), sublinear
 python ml/scripts/build_tfidf.py --dataset-dir ml/data/processed --output ml/artifacts/tfidf --max-features 10000 --min-df 2 --ngram-min 1 --ngram-max 2
 ```
 
-Available options: `--text-column`, `--label-column`, `--max-features`, `--min-df`, `--max-df`, `--ngram-min`, `--ngram-max`, and `--no-sublinear-tf`.
+Available options: `--text-column`, `--label-column`, `--max-features`, `--min-df`, `--max-df`, `--ngram-min`, `--ngram-max`, `--no-sublinear-tf`, and `--no-idf`.
 
 ### Generated artifacts
 
