@@ -7,26 +7,51 @@ client = TestClient(app)
 def test_health_endpoint_returns_ok():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "application": "ST-NLP", "phase": "21-admin-frontend"}
+    assert response.json() == {
+        "status": "ok",
+        "application": "ST-NLP",
+        "phase": "22-frontend-backend-integration",
+    }
 
 
-def test_citizen_portal_is_served():
+def test_citizen_portal_loads_shared_axios_client_before_app():
     response = client.get("/citizen/")
     assert response.status_code == 200
-    assert "Cổng người dân" in response.text
-    assert 'id="report-form"' in response.text
-    assert 'id="google-signin"' in response.text
+    html = response.text
+    assert "Cổng người dân" in html
+    assert 'id="report-form"' in html
+    assert 'id="google-signin"' in html
+    assert html.index("axios@1.21.1") < html.index("/assets/js/api-client.js") < html.index("/assets/js/app.js")
 
 
-def test_admin_portal_is_served_separately():
+def test_admin_portal_loads_shared_axios_client_before_app():
     response = client.get("/admin/")
     assert response.status_code == 200
-    assert "Đăng nhập quản trị" in response.text
-    assert 'id="login-form"' in response.text
-    assert 'id="dashboard-view"' in response.text
-    assert 'id="reports-view"' in response.text
-    assert 'id="map-view"' in response.text
-    assert 'id="detail-overlay"' in response.text
+    html = response.text
+    assert "Đăng nhập quản trị" in html
+    assert 'id="login-form"' in html
+    assert html.index("axios@1.21.1") < html.index("/assets/js/api-client.js") < html.index("/assets/js/admin.js")
+
+
+def test_shared_api_client_is_served_and_has_auth_error_and_role_interceptors():
+    response = client.get("/assets/js/api-client.js")
+    assert response.status_code == 200
+    assert "axios.create" in response.text
+    assert "interceptors.request.use" in response.text
+    assert "interceptors.response.use" in response.text
+    assert "401" in response.text
+    assert "assertRole" in response.text
+
+
+def test_frontend_api_integrations_use_shared_client_without_direct_fetch():
+    citizen = client.get("/assets/js/app.js")
+    admin = client.get("/assets/js/admin.js")
+    assert citizen.status_code == 200
+    assert admin.status_code == 200
+    assert "createApiClient" in citizen.text
+    assert "createApiClient" in admin.text
+    assert "fetch(" not in citizen.text
+    assert "fetch(" not in admin.text
 
 
 def test_admin_frontend_assets_are_available():
