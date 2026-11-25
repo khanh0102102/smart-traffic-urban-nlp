@@ -246,7 +246,7 @@ def update_report_status(
     report.status = payload.status
     if "final_category_code" in payload.model_fields_set:
         if payload.final_category_code is None:
-            report.final_category_id = None
+            report.final_category = None
         else:
             category = db.scalar(
                 select(IncidentCategory).where(
@@ -256,7 +256,7 @@ def update_report_status(
             )
             if category is None:
                 raise HTTPException(status_code=422, detail="Unknown or inactive category code.")
-            report.final_category_id = category.id
+            report.final_category = category
     db.commit()
     return _report_response(_report_or_404(db, report_id))
 
