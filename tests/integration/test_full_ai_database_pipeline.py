@@ -235,7 +235,7 @@ def test_full_ai_review_dataset_and_training_lineage(pipeline_client):
     assert completed.status_code == 200, completed.text
     assert completed.json()["status"] == "COMPLETED"
     assert completed.json()["model_version_id"] == str(model_version.id)
-    assert db.scalar(select(TrainingRun).where(TrainingRun.id == run_id)) is not None
+    assert db.scalar(select(TrainingRun).where(TrainingRun.id == UUID(run_id))) is not None
     assert len(db.scalars(select(TrainingMetric)).all()) == 2
 
     review_history = client.get(
