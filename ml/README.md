@@ -155,6 +155,67 @@ Additional options include `--padding pre|post`, `--truncating pre|post`, `--low
 ```powershell
 python -m pytest ml/tests/test_embedding.py -q
 ```
+## Phase 8 – Naive Bayes classification
+
+The module in `ml/src/naive_bayes/` trains a `MultinomialNB` classifier from Phase 6 TF-IDF matrices. It saves a single inference bundle containing the trained model, the exact TF-IDF vectorizer, and the fixed R01–R11 label encoder.
+
+### Train and evaluate
+
+Run Phase 4–6 first, then train from the repository root:
+
+```powershell
+python ml/scripts/train_naive_bayes.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/naive_bayes
+```
+
+The default additive smoothing parameter is `alpha=1.0`, and class priors are learned from train. The model is fitted only on `X_train.npz` and `y_train.csv`. Validation and test matrices are evaluated separately; neither is used to fit the model.
+
+### Predict a new citizen report
+
+Use raw Vietnamese text. The CLI applies the saved Phase 5 preprocessing pipeline before TF-IDF transformation:
+
+```powershell
+python ml/scripts/predict_naive_bayes.py --text "Đèn đường trước nhà bị hỏng nhiều ngày, buổi tối không có ánh sáng"
+```
+
+Predict several rows from a CSV file (default source column `content`):
+
+```powershell
+python ml/scripts/predict_naive_bayes.py --input reports_to_classify.csv --text-column content --output predictions.csv
+```
+
+If the CSV already contains Phase 5 `processed_text`, skip preprocessing explicitly:
+
+```powershell
+python ml/scripts/predict_naive_bayes.py --input ml/data/processed/test.csv --text-column processed_text --already-processed --output ml/artifacts/naive_bayes/test_predictions.csv
+```
+
+Each prediction contains the category code/name, maximum class probability (`confidence`), processed text, and `has_known_features`. If no input token is present in the training TF-IDF vocabulary, the model still returns a prior-based prediction but sets `has_known_features=false` and adds a warning; treat that prediction as unreliable.
+
+### Evaluation and saved artifacts
+
+- `naive_bayes_bundle.joblib`: trained MultinomialNB + fitted TF-IDF vectorizer + canonical label encoder + preprocessing metadata.
+- `predictions_validation.csv`, `predictions_test.csv`: actual/predicted code and name, confidence and correctness per row.
+- `confusion_matrix_validation.csv`, `confusion_matrix_test.csv`: fixed R01–R11 confusion matrices.
+- `top_terms_by_class.csv`: terms with the largest class-conditional log probabilities.
+- `naive_bayes_summary.json`: hyperparameters, trained classes, feature count, validation/test accuracy and precision/recall/F1 reports.
+
+The artifacts are written under `ml/artifacts/naive_bayes/`; they are local and excluded from Git.
+
+**Data limitation:** the included sample has very few reports per category and is only a pipeline demonstration. A useful production classifier requires a larger, manually verified, balanced dataset. A category absent from the training split cannot be predicted by that fitted model.
+
+### Tune smoothing
+
+```powershell
+python ml/scripts/train_naive_bayes.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/naive_bayes --alpha 0.5 --top-terms 30
+```
+
+Use validation metrics to compare settings. Keep the test split as a final holdout and avoid repeatedly tuning against it.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_naive_bayes.py -q
+```
 ### Outputs
 - `train.csv`, `validation.csv`, `test.csv`: labeled records split 70/15/15.
 - `labeled_all.csv`: all deduplicated labeled rows before splitting.
