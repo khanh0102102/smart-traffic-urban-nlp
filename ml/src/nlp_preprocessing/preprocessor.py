@@ -73,7 +73,16 @@ def normalize_abbreviations(
             pattern = re.compile(r"(?<!\w)" + escaped + r"(?=\s|\d|[A-Za-zÀ-ỹ]|$)", re.IGNORECASE)
         else:
             pattern = re.compile(r"(?<!\w)" + escaped + r"(?!\w)", re.IGNORECASE)
-        text = pattern.sub(replacements[shortcut], text)
+        expansion = replacements[shortcut]
+        if shortcut.endswith("."):
+            text = pattern.sub(
+                lambda match, value=expansion: value + (
+                    " " if match.end() < len(text) and not text[match.end()].isspace() else ""
+                ),
+                text,
+            )
+        else:
+            text = pattern.sub(expansion, text)
     return unicodedata.normalize("NFC", re.sub(r"\s+", " ", text).strip())
 
 
