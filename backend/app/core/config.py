@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     report_max_attachments: int = 5
 
     @property
+    def report_storage_root(self) -> Path:
+        """Resolve relative upload paths against the repository root, not the process CWD."""
+        path = self.report_upload_dir.expanduser()
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path.resolve()
+
+    @property
     def sqlalchemy_url(self) -> URL:
         if self.database_url:
             return make_url(self.database_url)
