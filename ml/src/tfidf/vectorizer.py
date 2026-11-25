@@ -158,10 +158,11 @@ def build_tfidf(config: TfidfConfig | None = None) -> TfidfResult:
     _save_labels(test, output / "y_test.csv", config)
 
     feature_names = vectorizer.get_feature_names_out()
+    idf_values = vectorizer.idf_ if config.use_idf else [1.0] * len(feature_names)
     vocabulary = pd.DataFrame({
         "feature_index": range(len(feature_names)),
         "term": feature_names,
-        "idf": vectorizer.idf_,
+        "idf": idf_values,
     })
     vocabulary.to_csv(output / "vocabulary.csv", index=False, encoding="utf-8-sig")
 
