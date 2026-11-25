@@ -327,7 +327,7 @@ Default configuration: 20 epochs, batch size 32, 128 filters per convolution bra
 - The CNN reuses the tokenizer and fixed R01–R11 label encoder saved by Phase 7; it does not refit vocabulary or label IDs.
 - Model weights and class weights are learned from the training split only.
 - Validation is used only for early stopping and validation metrics. The test split is reserved for final evaluation.
-- The custom masked global max-pooling operation excludes token ID 0 (PAD) so padded positions cannot become the maximum pooled feature. Token ID 1 remains the OOV token.
+- A custom layer zeros the PAD embedding vectors before convolution, and masked global max pooling excludes token ID 0 positions. Token ID 1 remains the OOV token.
 - The reported maximum softmax score is a model confidence score, not a separately calibrated probability.
 
 ### Predict a new report
