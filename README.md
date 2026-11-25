@@ -21,7 +21,7 @@ python scripts/seed_categories.py
 ```
 Wait until `stnlp-postgres` is healthy before running migrations. The default database is `stnlp` on port `5432`.
 
-## Phases 4–5 – Data processing and Vietnamese NLP preprocessing
+## Phases 4–6 – Data processing, Vietnamese NLP preprocessing and TF-IDF
 Install the ML dependencies and run the included sample. The pipeline cleans source text, applies Unicode NFC and abbreviation normalization, segments Vietnamese words, removes conservative stopwords, deduplicates, labels and splits the dataset:
 
 ```powershell
@@ -29,7 +29,7 @@ python -m pip install -r ml/requirements.txt
 python ml/scripts/prepare_dataset.py --input ml/data/sample_reports.csv --text-column content --label-column category
 ```
 
-Inspect the NLP stages independently with `python ml/scripts/inspect_nlp.py --text "Đg. này ko thông thoáng tại Q.1"`. See [`ml/README.md`](ml/README.md) for supported input formats, dictionaries, stopword configuration, output files, weak-label review rules and split details. Generated datasets remain local and are excluded from Git.
+Inspect the NLP stages independently with `python ml/scripts/inspect_nlp.py --text "Đg. này ko thông thoáng tại Q.1"`. After Phase 4–5 completes, build TF-IDF matrices with `python ml/scripts/build_tfidf.py --dataset-dir ml/data/processed --output ml/artifacts/tfidf`. The vectorizer is fitted on train only and transforms validation/test with the same vocabulary. See [`ml/README.md`](ml/README.md) for details. Processed data and model artifacts remain local and are excluded from Git.
 
 ## Run backend
 ```powershell

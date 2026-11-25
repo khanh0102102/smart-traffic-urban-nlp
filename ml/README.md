@@ -44,6 +44,47 @@ If your file has no label column, omit `--label-column`; unique, unambiguous key
 
 The dataset CLI also accepts `--abbreviations path/to/file.json` and `--stopwords path/to/file.txt`. Use `--keep-stopwords` to keep all segmented tokens in `processed_text` while still performing word segmentation.
 
+## Phase 6 – TF-IDF feature extraction
+
+The module in `ml/src/tfidf/` converts the Phase 5 `processed_text` field into sparse numerical feature matrices using scikit-learn `TfidfVectorizer`.
+
+### Build TF-IDF matrices
+
+Run Phase 4–5 first so that `ml/data/processed/train.csv`, `validation.csv` and `test.csv` exist. Then run from the repository root:
+
+```powershell
+python ml/scripts/build_tfidf.py --dataset-dir ml/data/processed --output ml/artifacts/tfidf
+```
+
+Default settings use unigram + bigram features (`ngram_range=(1, 2)`), sublinear term frequency, IDF weighting, L2 normalization, and a maximum vocabulary size of 20,000 terms. Vietnamese diacritics are preserved. Since Phase 5 already performs Vietnamese word segmentation, TF-IDF splits the prepared text on whitespace and keeps compound segmented tokens such as `đèn_đường` intact.
+
+### Important data-splitting rule
+
+**The vectorizer is fitted only on `train.csv`.** The same fitted vocabulary and IDF weights are applied to `validation.csv` and `test.csv` using `transform()`. Validation/test words that are absent from the training vocabulary are ignored. This prevents information from held-out splits leaking into feature construction.
+
+### Useful options
+
+```powershell
+python ml/scripts/build_tfidf.py --dataset-dir ml/data/processed --output ml/artifacts/tfidf --max-features 10000 --min-df 2 --ngram-min 1 --ngram-max 2
+```
+
+Available options: `--text-column`, `--label-column`, `--max-features`, `--min-df`, `--max-df`, `--ngram-min`, `--ngram-max`, `--no-sublinear-tf`, and `--no-idf`.
+
+### Generated artifacts
+
+- `tfidf_vectorizer.joblib`: fitted vectorizer for later inference.
+- `X_train.npz`, `X_validation.npz`, `X_test.npz`: compressed sparse TF-IDF matrices.
+- `y_train.csv`, `y_validation.csv`, `y_test.csv`: labels aligned to matrix rows by `row_index`.
+- `vocabulary.csv`: feature index, token/ngram and learned IDF weight.
+- `tfidf_summary.json`: configuration, library version, matrix dimensions and sparsity statistics.
+
+Artifacts are written under `ml/artifacts/tfidf/` and remain local because the `ml/artifacts/*` folder is excluded from Git.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_tfidf.py -q
+```
 ### Outputs
 - `train.csv`, `validation.csv`, `test.csv`: labeled records split 70/15/15.
 - `labeled_all.csv`: all deduplicated labeled rows before splitting.
