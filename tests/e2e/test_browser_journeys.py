@@ -180,6 +180,7 @@ def test_citizen_submits_report_and_staff_confirms_prediction(tmp_path, monkeypa
         db.add_all([*categories, citizen, staff])
         db.commit()
         db.refresh(citizen)
+        db.refresh(staff)
 
     citizen_token, _ = create_access_token(citizen.id, citizen.role)
     port = _free_port()
