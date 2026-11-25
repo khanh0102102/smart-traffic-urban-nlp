@@ -450,3 +450,59 @@ python -m pytest ml/tests/test_lstm.py -q
 ```
 
 The LSTM tests are skipped automatically when TensorFlow is not installed.
+
+
+## Phase 12 – Unified model evaluation
+
+Phase 12 compares the four classifiers from Phases 8–11 using their saved held-out predictions. It does not retrain models or recalculate features. The module uses the fixed R01–R11 taxonomy and reports Accuracy, per-class Precision/Recall/F1, Macro Precision/Recall/F1, Weighted Precision/Recall/F1, and 11×11 Confusion Matrices. Validation and test are evaluated separately.
+
+### Run evaluation
+
+Train the models first so their output directories contain `predictions_validation.csv` and/or `predictions_test.csv`. Then run from the repository root:
+
+```powershell
+python ml/scripts/evaluate_models.py
+```
+
+By default the CLI reads:
+- `ml/artifacts/naive_bayes/`
+- `ml/artifacts/svm/`
+- `ml/artifacts/cnn/`
+- `ml/artifacts/lstm/`
+
+To evaluate only the final test split:
+
+```powershell
+python ml/scripts/evaluate_models.py --splits test
+```
+
+To require prediction files from all four models (otherwise missing model directories are listed as skipped):
+
+```powershell
+python ml/scripts/evaluate_models.py --require-all-models
+```
+
+Custom artifact directories can be supplied with `--naive-bayes-dir`, `--svm-dir`, `--cnn-dir`, and `--lstm-dir`; use `--output` to change the report directory.
+
+### Evaluation safeguards
+
+- The evaluator consumes each model's saved prediction CSV; it never trains or tunes a model.
+- All scores use the complete fixed R01–R11 label list and `zero_division=0`, so classes missing from a small split remain visible in reports and confusion matrices.
+- Models are compared only when their row_index and actual_label_code sequences match within the same split. This prevents misleading comparisons across different test examples.
+- Validation metrics are for model selection. Test metrics are the final holdout and should not be used repeatedly for tuning.
+- Macro F1 gives each category equal weight; Weighted F1 accounts for the number of actual examples in each category. Report both because the dataset may be imbalanced.
+
+### Generated artifacts
+
+Reports are written under `ml/artifacts/evaluation/`:
+- `model_comparison.csv`: one row per model and split, including Accuracy, Macro and Weighted Precision/Recall/F1.
+- `classification_report_<model>_<split>.csv`: per-category Precision, Recall, F1 and support.
+- `confusion_matrix_<model>_<split>.csv`: fixed 11×11 confusion matrix.
+- `errors_<model>_<split>.csv`: row indices and actual/predicted category codes for misclassified examples.
+- `evaluation_summary.json`: taxonomy, metrics, skipped models and ranking by split.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_evaluation.py -q
+```
