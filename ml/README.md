@@ -216,6 +216,70 @@ Use validation metrics to compare settings. Keep the test split as a final holdo
 ```powershell
 python -m pytest ml/tests/test_naive_bayes.py -q
 ```
+## Phase 9 – SVM classification and probability calibration
+
+The module in `ml/src/svm/` uses `LinearSVC` on Phase 6 sparse TF-IDF matrices. It optionally wraps the linear SVM with `CalibratedClassifierCV` (sigmoid by default) so inference can return calibrated class probabilities.
+
+### Train and evaluate
+
+Run Phase 4–6 first, then train from the repository root:
+
+```powershell
+python ml/scripts/train_svm.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/svm
+```
+
+Default settings: `C=1.0`, `class_weight=balanced`, `max_iter=10000`, sigmoid probability calibration and up to 3 stratified folds. The estimator and calibration folds use only `X_train.npz` and `y_train.csv`; validation/test are held out for evaluation.
+
+### Probability calibration and small datasets
+
+- If every training class has at least two examples, the module calibrates SVM scores using stratified cross-validation on train only. The number of folds is lowered when needed to fit the smallest class count.
+- If any training class has only one example, SVM training continues without calibration. In that case, prediction outputs `confidence=null`, `probability_calibrated=false`, and a decision margin; a margin is not a probability.
+- Isotonic calibration is accepted only when every class has at least 1,000 training examples. For smaller datasets, use sigmoid calibration.
+- Validation/test are never used to fit the SVM or the probability calibrator.
+
+### Predict a new report
+
+Raw Vietnamese text is passed through the same Phase 5 preprocessing before applying the saved TF-IDF vectorizer:
+
+```powershell
+python ml/scripts/predict_svm.py --text "Đèn đường trước nhà bị hỏng nhiều ngày, buổi tối không có ánh sáng"
+```
+
+Predict a CSV file:
+
+```powershell
+python ml/scripts/predict_svm.py --input reports_to_classify.csv --text-column content --output svm_predictions.csv
+```
+
+For an input column that already contains Phase 5 `processed_text`, pass `--already-processed`.
+
+Prediction results include the predicted R01–R11 code/name, `confidence` (only when calibrated), `class_probabilities`, `decision_margin`, `probability_calibrated`, and `has_known_features`. An all-OOV report receives a warning because the model is then relying on its intercepts rather than learned TF-IDF terms.
+
+### Tune the SVM
+
+```powershell
+python ml/scripts/train_svm.py --tfidf-dir ml/artifacts/tfidf --output ml/artifacts/svm --C 0.5 --class-weight balanced --calibration-method sigmoid --calibration-cv 3
+```
+
+Try `--class-weight none` to disable class balancing, `--no-calibration` to train without probability calibration, and `--top-features 30` to export more influential positive features per class. Compare settings on validation metrics; keep test as a final holdout.
+
+### Generated artifacts
+
+- `svm_bundle.joblib`: fitted SVM, exact TF-IDF vectorizer, label encoder and calibration metadata.
+- `predictions_validation.csv`, `predictions_test.csv`: prediction and evaluation details.
+- `confusion_matrix_validation.csv`, `confusion_matrix_test.csv`: fixed R01–R11 confusion matrices.
+- `top_features_by_class.csv`: highest positive linear coefficients per trained category.
+- `svm_summary.json`: hyperparameters, calibration status, trained classes and metrics.
+
+Artifacts are written under `ml/artifacts/svm/` and remain local because `ml/artifacts/*` is excluded from Git.
+
+**Data limitation:** the included sample dataset is only a pipeline demonstration. Reliable SVM performance and probability calibration require a larger, manually verified dataset with enough examples in each class.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_svm.py -q
+```
 ### Outputs
 - `train.csv`, `validation.csv`, `test.csv`: labeled records split 70/15/15.
 - `labeled_all.csv`: all deduplicated labeled rows before splitting.
