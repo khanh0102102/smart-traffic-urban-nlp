@@ -24,7 +24,9 @@ jobs:
           pip install -r backend/requirements-dev.txt
 
       - name: Check JavaScript syntax
-        run: node --check frontend/assets/js/app.js
+        run: |
+          node --check frontend/assets/js/app.js
+          node --check frontend/assets/js/admin.js
 
       - name: Run tests
         run: python -m pytest -q
