@@ -95,20 +95,19 @@ def test_google_login_refuses_to_link_staff_account(client, db_session, monkeypa
     assert response.status_code == 409
 
 
-def test_google_login_requires_verified_email(client, monkeypatch):
-    import app.core.auth_service as service
-    monkeypatch.setattr(
-        service, "verify_google_id_token",
-        lambda _token: google_claims(email_verified=False),
-    )
-    # The verifier itself rejects unverified email; this endpoint must return an auth error.
+def test_google_token_verifier_rejects_unverified_email(monkeypatch):
     from fastapi import HTTPException
-    def reject_unverified(_token):
-        raise HTTPException(status_code=401, detail="Google account must have a verified email.")
-    monkeypatch.setattr(service, "verify_google_id_token", reject_unverified)
+    import app.core.google_auth as google_auth
 
-    response = client.post("/api/v1/auth/google", json={"id_token": "x" * 40})
-    assert response.status_code == 401
+    monkeypatch.setattr(settings, "google_client_id", "test-web-client-id")
+    monkeypatch.setattr(
+        google_auth.id_token,
+        "verify_oauth2_token",
+        lambda _token, _request, _audience: google_claims(email_verified=False),
+    )
+    with pytest.raises(HTTPException) as error:
+        google_auth.verify_google_id_token("x" * 40)
+    assert error.value.status_code == 401
 
 
 def test_staff_login_returns_jwt_and_staff_role_is_authorized(client, db_session):
