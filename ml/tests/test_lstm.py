@@ -69,6 +69,7 @@ def test_lstm_architecture_has_eleven_outputs_and_explicit_mask():
     assert model.output_shape == (None, 11)
     assert model.name == "stnlp_lstm_text_classifier"
     assert "lstm_sequence_encoder" in [layer.name for layer in model.layers]
+    assert model.get_layer("token_embedding").mask_zero is True
 
     sample = np.zeros((2, 12), dtype=np.int32)
     sample[0, :2] = [2, 3]
@@ -76,6 +77,15 @@ def test_lstm_architecture_has_eleven_outputs_and_explicit_mask():
     probabilities = model.predict(sample, verbose=0)
     assert probabilities.shape == (2, 11)
     assert np.allclose(probabilities.sum(axis=1), 1.0, atol=1e-5)
+
+    # The same tokens should produce the same output with pre- or post-padding.
+    padding_positions = np.zeros((2, 12), dtype=np.int32)
+    padding_positions[0, :2] = [2, 3]
+    padding_positions[1, -2:] = [2, 3]
+    padding_predictions = model.predict(padding_positions, verbose=0)
+    assert np.allclose(
+        padding_predictions[0], padding_predictions[1], atol=1e-5
+    )
 
 
 def test_bidirectional_lstm_option_builds_encoder():
