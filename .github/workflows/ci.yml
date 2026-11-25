@@ -25,6 +25,7 @@ jobs:
 
       - name: Check JavaScript syntax
         run: |
+          node --check frontend/assets/js/api-client.js
           node --check frontend/assets/js/app.js
           node --check frontend/assets/js/admin.js
 
