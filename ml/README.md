@@ -512,3 +512,79 @@ Reports are written under `ml/artifacts/evaluation/`:
 ```powershell
 python -m pytest ml/tests/test_evaluation.py -q
 ```
+
+## Phase 13 – Best-model packaging and shared inference
+
+Phase 13 selects the best of Naive Bayes, SVM, 1D-CNN and LSTM using **validation Macro F1** from Phase 12, then packages the trained model with the exact representation assets it needs. Ties are broken by validation Weighted F1, then Accuracy, then model key. The test split is never used to select the deployed model.
+
+### Build the inference package
+
+Complete Phases 8–12 first. All four model bundles and the Phase 12 comparison report must exist. Run from the repository root:
+
+```powershell
+python ml/scripts/build_inference.py
+```
+
+Default inputs:
+- `ml/artifacts/evaluation/model_comparison.csv`
+- `ml/artifacts/naive_bayes/naive_bayes_bundle.joblib`
+- `ml/artifacts/svm/svm_bundle.joblib`
+- `ml/artifacts/cnn/cnn_bundle.joblib`
+- `ml/artifacts/lstm/lstm_bundle.joblib`
+
+The builder checks that validation results exist for all four models and that the selected bundle uses the canonical R01–R11 taxonomy. For CNN/LSTM, it also copies the matching `.keras` file into the inference output directory. It does not retrain or modify the selected estimator.
+
+### Run one prediction
+
+```powershell
+python ml/scripts/predict.py --text "Đèn đường trước nhà bị hỏng nhiều ngày, buổi tối không có ánh sáng"
+```
+
+Several texts can be supplied by repeating `--text`:
+
+```powershell
+python ml/scripts/predict.py --text "Đèn đường bị hỏng" --text "Hố ga mất nắp"
+```
+
+For batch CSV prediction:
+
+```powershell
+python ml/scripts/predict.py --input reports_to_classify.csv --text-column content --output ml/artifacts/inference/predictions.csv
+```
+
+When the input column already contains Phase 5 `processed_text`, add `--already-processed`. The output includes the selected model, predicted category code/name, processed text, confidence score/type, class scores, known-vocabulary indicator and manual-review reasons.
+
+### Shared inference API
+
+The reusable class is `src.inference.ModelPredictor`. Instantiate it once when integrating with FastAPI so the selected estimator (and Keras model, when applicable) stays loaded for repeated requests:
+
+```python
+from src.inference import ModelPredictor
+
+predictor = ModelPredictor("ml/artifacts/inference/best_model_bundle.joblib")
+result = predictor.predict(["Hố ga trước nhà bị mất nắp"])
+```
+
+The predictor applies the saved Phase 5 preprocessing configuration by default. Pass `already_processed=True` only when the supplied text has already been processed by the same Phase 5 pipeline.
+
+### Confidence and manual review
+
+The project review threshold defaults to 60%. A result at or below the threshold is marked `needs_manual_review=true`. Reports with no known TF-IDF features or no known Phase 7 tokens are also flagged. An uncalibrated SVM returns no confidence probability; its decision margin is exposed separately and is never presented as a probability. Naive Bayes and neural-network maximum scores are identified as model scores, not calibrated probabilities.
+
+### Generated artifacts
+
+Artifacts are written under `ml/artifacts/inference/`:
+- `best_model_bundle.joblib`: selected trained classifier plus its vectorizer or tokenizer, label encoder and preprocessing metadata.
+- `best_model.keras`: copied Keras model file when CNN or LSTM is selected.
+- `model_selection.json`: selected model, validation Macro F1, tie-break metrics, source bundle and taxonomy.
+- Batch prediction CSVs are written to the output path supplied to `ml/scripts/predict.py`.
+
+The artifact directory is local and excluded from Git. Re-run the builder whenever you intentionally change the evaluation report or retrain a model.
+
+### Run tests
+
+```powershell
+python -m pytest ml/tests/test_inference.py -q
+```
+
+The inference tests use a lightweight Naive Bayes/LinearSVC fixture; an actual CNN/LSTM inference run additionally requires TensorFlow and the trained Keras artifacts.
