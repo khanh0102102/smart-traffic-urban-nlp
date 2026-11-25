@@ -339,6 +339,66 @@ def test_training_run_lifecycle_and_metric_management(client, db_session):
     assert listed.json()["total"] == 1
 
 
+
+def test_training_run_requires_verified_train_sample(client, db_session):
+    data = setup_users_and_categories(db_session)
+    headers = auth_headers(data["staff"])
+    dataset = create_dataset(client, headers).json()
+
+    unverified = client.post(
+        f"/api/v1/ml/datasets/{dataset['id']}/samples",
+        headers=headers,
+        json={
+            "items": [
+                {
+                    "raw_text": "Phản ánh chưa được nhân viên xác minh.",
+                    "category_code": "R01",
+                    "split": "TRAIN",
+                    "is_verified": False,
+                }
+            ]
+        },
+    )
+    assert unverified.status_code == 201
+    rejected = client.post(
+        "/api/v1/ml/training-runs",
+        headers=headers,
+        json={
+            "dataset_id": dataset["id"],
+            "algorithm": "NAIVE_BAYES",
+            "representation": "TF_IDF",
+        },
+    )
+    assert rejected.status_code == 422
+    assert "verified TRAIN" in rejected.json()["detail"]
+
+    verified = client.post(
+        f"/api/v1/ml/datasets/{dataset['id']}/samples",
+        headers=headers,
+        json={
+            "items": [
+                {
+                    "raw_text": "Phản ánh đã được nhân viên xác minh.",
+                    "category_code": "R01",
+                    "split": "TRAIN",
+                    "is_verified": True,
+                }
+            ]
+        },
+    )
+    assert verified.status_code == 201
+    accepted = client.post(
+        "/api/v1/ml/training-runs",
+        headers=headers,
+        json={
+            "dataset_id": dataset["id"],
+            "algorithm": "NAIVE_BAYES",
+            "representation": "TF_IDF",
+        },
+    )
+    assert accepted.status_code == 201, accepted.text
+
+
 def test_training_requires_train_samples_and_dataset_delete_is_protected(client, db_session):
     data = setup_users_and_categories(db_session)
     headers = auth_headers(data["staff"])
