@@ -4,12 +4,12 @@ import argparse
 import json
 import sys
 from pathlib import Path
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT))
-from src.data_processing.pipeline import ProcessingConfig, run_pipeline
+ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/"ml"))
+from src.data_processing.pipeline import ProcessingConfig,run_pipeline
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Clean, normalize, deduplicate, label and split ST-NLP report data.")
+    parser=argparse.ArgumentParser(description="Clean, normalize, deduplicate, label and split ST-NLP report data.")
     parser.add_argument("--input",required=True,help="CSV, TSV, XLSX, JSON, JSONL or TXT source file.")
     parser.add_argument("--output",default="ml/data/processed")
     parser.add_argument("--text-column",default=None)
