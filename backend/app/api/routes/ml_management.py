@@ -1,6 +1,4 @@
 """Staff ML management API for datasets, samples, training runs and metrics."""
-from __future__ import annotations
-
 from datetime import datetime, timezone
 from math import ceil
 from typing import Literal
