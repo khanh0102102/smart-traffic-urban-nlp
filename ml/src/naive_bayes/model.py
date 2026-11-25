@@ -69,6 +69,11 @@ def _load_labels(path: Path, *, required: bool = True) -> list[str]:
     frame = pd.read_csv(path, encoding="utf-8-sig", keep_default_na=False)
     if "label_code" not in frame.columns:
         raise ValueError(f"{path.name} must contain a label_code column.")
+    if "row_index" in frame.columns:
+        indices = pd.to_numeric(frame["row_index"], errors="coerce")
+        expected = np.arange(len(frame), dtype=np.int64)
+        if indices.isna().any() or not np.array_equal(indices.to_numpy(dtype=np.int64), expected):
+            raise ValueError(f"{path.name} row_index must be sequential and aligned with the feature matrix.")
     labels = frame["label_code"].astype(str).str.strip().str.upper().tolist()
     if any(not label for label in labels):
         raise ValueError(f"{path.name} contains an empty label_code.")
@@ -98,7 +103,27 @@ def _evaluate(
     split_name: str,
     output: Path,
 ) -> dict[str, Any] | None:
+    category_codes = label_encoder.classes_.tolist()
     if matrix.shape[0] == 0:
+        empty_predictions = pd.DataFrame(columns=[
+            "row_index", "actual_label_code", "predicted_label_code",
+            "actual_label_name", "predicted_label_name", "confidence", "correct",
+        ])
+        empty_predictions.to_csv(
+            output / f"predictions_{split_name}.csv",
+            index=False,
+            encoding="utf-8-sig",
+        )
+        empty_confusion = pd.DataFrame(
+            np.zeros((len(category_codes), len(category_codes)), dtype=np.int64),
+            index=category_codes,
+            columns=category_codes,
+        )
+        empty_confusion.index.name = "actual_label_code"
+        empty_confusion.to_csv(
+            output / f"confusion_matrix_{split_name}.csv",
+            encoding="utf-8-sig",
+        )
         return None
 
     predicted_ids = model.predict(matrix).astype(np.int64)
