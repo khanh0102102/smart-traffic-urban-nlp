@@ -1,4 +1,7 @@
 [tool.pytest.ini_options]
-testpaths = ["tests", "backend/tests"]
-pythonpath = ["backend"]
+testpaths = ["tests", "backend/tests", "ml/tests"]
+pythonpath = ["backend", "ml"]
 addopts = "-ra"
+markers = [
+    "e2e: real-browser end-to-end tests (run in the dedicated browser CI job)",
+]
