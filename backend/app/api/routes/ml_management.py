@@ -6,7 +6,7 @@ from math import ceil
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -366,7 +366,7 @@ def list_dataset_samples(
 @router.patch("/dataset-samples/{sample_id}", response_model=DatasetSampleRead)
 def update_dataset_sample(
     sample_id: UUID,
-    payload: DatasetSampleUpdate,
+    payload: DatasetSampleUpdate = Body(...),
     _current_user: User = Depends(require_roles("ADMIN", "RECEIVER")),
     db: Session = Depends(get_db),
 ):
