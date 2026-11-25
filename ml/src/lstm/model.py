@@ -121,18 +121,20 @@ def build_lstm_model(
     token_ids = tf.keras.Input(
         shape=(sequence_length,), dtype="int32", name="token_ids"
     )
-    embedded = tf.keras.layers.Embedding(
+    embedding_layer = tf.keras.layers.Embedding(
         input_dim=vocab_size,
         output_dim=embedding_dim,
         mask_zero=True,
         name="token_embedding",
-    )(token_ids)
+    )
+    embedded = embedding_layer(token_ids)
+    token_mask = embedding_layer.compute_mask(token_ids)
     embedded = tf.keras.layers.SpatialDropout1D(
         embedding_dropout, name="embedding_spatial_dropout"
     )(embedded)
 
-    # The Embedding layer generates a boolean mask from PAD token ID 0.
-    # Keras propagates this mask through SpatialDropout1D to the recurrent layer.
+    # Pass the Embedding-generated mask explicitly so the recurrent layer
+    # ignores PAD even if an intermediate regularization layer changes mask metadata.
     if bidirectional:
         encoded = tf.keras.layers.Bidirectional(
             tf.keras.layers.LSTM(
@@ -143,7 +145,7 @@ def build_lstm_model(
                 name="lstm_cell",
             ),
             name="bidirectional_lstm_encoder",
-        )(embedded)
+        )(embedded, mask=token_mask)
     else:
         encoded = tf.keras.layers.LSTM(
             lstm_units,
@@ -151,7 +153,7 @@ def build_lstm_model(
             dropout=dropout,
             recurrent_dropout=0.0,
             name="lstm_sequence_encoder",
-        )(embedded)
+        )(embedded, mask=token_mask)
 
     hidden = tf.keras.layers.Dense(
         dense_units, activation="relu", name="classifier_dense"
@@ -446,7 +448,7 @@ def train_lstm(config: LSTMConfig | None = None) -> LSTMResult:
                 "type": "LSTM" if not config.bidirectional else "Bidirectional(LSTM)",
                 "units_per_direction": config.lstm_units,
                 "return_sequences": False,
-                "masking": "Embedding(mask_zero=True) propagates a PAD mask into the recurrent layer",
+                "masking": "Embedding.compute_mask() is passed explicitly; token ID 0 is excluded from recurrent updates",
             },
             "classifier": [
                 {"type": "Dense", "units": config.dense_units, "activation": "relu"},
@@ -488,7 +490,7 @@ def train_lstm(config: LSTMConfig | None = None) -> LSTMResult:
         ],
         "notes": [
             "Tokenizer and label encoder are reused from Phase 7 and are not refitted.",
-            "The Embedding mask is propagated into the LSTM so PAD token ID 0 is ignored for both pre- and post-padding.",
+            "The mask computed by the Embedding layer is passed explicitly into LSTM so PAD token ID 0 is ignored for both pre- and post-padding.",
             "Only training sequences update model weights; validation is used for early stopping when non-empty.",
             "The test split is reserved for final evaluation.",
             "Confidence is the maximum softmax score and is not guaranteed to be calibrated.",
