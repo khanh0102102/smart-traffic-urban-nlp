@@ -8,7 +8,7 @@ router = APIRouter()
 
 @router.get("/health", tags=["System"], summary="Check API health")
 def health_check() -> dict[str, str]:
-    return {"status": "ok", "application": "ST-NLP", "phase": "19-ml-management-api"}
+    return {"status": "ok", "application": "ST-NLP", "phase": "20-citizen-frontend"}
 
 
 @router.get("/health/database", tags=["System"], summary="Check PostgreSQL connectivity")
