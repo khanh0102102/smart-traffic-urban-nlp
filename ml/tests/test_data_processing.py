@@ -34,3 +34,14 @@ def test_pipeline_deduplicates_and_exports_review_and_splits(tmp_path):
     assert (output/"needs_review.csv").exists()
     assert (output/"duplicates.csv").exists()
     assert (output/"dataset_summary.json").exists()
+
+
+def test_conflicting_labels_on_duplicate_text_are_sent_to_review(tmp_path):
+    source=tmp_path/"conflicts.csv"
+    source.write_text('content,category\n"Đường có ổ gà",R01\n"Đường có ổ gà!",R02\n"Đèn đường bị hỏng",R02\n"Rác thải gây mùi hôi",R09\n"Biển báo bị che khuất",R06\n',encoding="utf-8")
+    output=tmp_path/"out"
+    result=run_pipeline(ProcessingConfig(input_path=str(source),output_dir=str(output),use_keyword_rules=False))
+    assert result.duplicate_rows == 1
+    assert result.review_rows == 1
+    review=(output/"needs_review.csv").read_text(encoding="utf-8-sig")
+    assert "duplicate_label_conflict" in review
