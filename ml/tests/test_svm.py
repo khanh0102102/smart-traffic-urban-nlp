@@ -80,6 +80,7 @@ def test_svm_trains_calibrates_saves_and_predicts(tmp_path):
     assert result.probability_calibrated is True
     assert result.calibration_method == "sigmoid"
     assert result.calibration_cv == 3
+    assert result.calibration_reason is None
 
     for filename in (
         "svm_bundle.joblib",
@@ -124,6 +125,7 @@ def test_svm_falls_back_to_un_calibrated_margins_for_singleton_class(tmp_path):
 
     assert result.probability_calibrated is False
     assert result.calibration_cv is None
+    assert result.calibration_reason is not None
     predictions = predict_svm_reports(
         ["duong o_ga"],
         model_path=output / "svm_bundle.joblib",
@@ -165,3 +167,26 @@ def test_svm_validates_hyperparameters():
         train_svm(SVMConfig(C=0))
     with pytest.raises(ValueError, match="calibration_method"):
         train_svm(SVMConfig(calibration_method="invalid"))
+
+def test_svm_rejects_isotonic_calibration_for_small_dataset(tmp_path):
+    tfidf_dir = tmp_path / "tfidf"
+    _prepare_tfidf_artifacts(tfidf_dir)
+    with pytest.raises(ValueError, match="3000 total"):
+        train_svm(SVMConfig(
+            tfidf_dir=str(tfidf_dir),
+            output_dir=str(tmp_path / "out"),
+            calibration_method="isotonic",
+        ))
+
+
+def test_svm_can_train_with_calibration_disabled(tmp_path):
+    tfidf_dir = tmp_path / "tfidf"
+    _prepare_tfidf_artifacts(tfidf_dir)
+    result = train_svm(SVMConfig(
+        tfidf_dir=str(tfidf_dir),
+        output_dir=str(tmp_path / "svm"),
+        calibrate_probabilities=False,
+    ))
+    assert result.probability_calibrated is False
+    assert result.calibration_reason == "Probability calibration disabled by configuration."
+
