@@ -1,19 +1,17 @@
 <!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ST-NLP | Cổng người dân</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <script defer src="/assets/js/app.js"></script>
-</head>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="google-client-id" content="YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com"><meta name="theme-color" content="#123f35"><title>ST-NLP | Cổng người dân</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="/assets/css/style.css"><script src="https://accounts.google.com/gsi/client" async defer></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script defer src="/assets/js/app.js"></script></head>
 <body>
-  <main class="page">
-    <p class="eyebrow">SMART TRAFFIC & URBAN INCIDENT CLASSIFIER</p>
-    <h1>Cổng người dân</h1>
-    <p>Đây là trang khởi tạo của khu vực người dân. Các chức năng gửi phản ánh sẽ được triển khai ở giai đoạn tiếp theo.</p>
-    <span class="status" data-app-status>Project skeleton is ready</span>
-    <p class="portal-link"><a href="/admin/">Đi tới cổng quản trị (trang kiểm tra)</a></p>
-  </main>
-</body>
-</html>
+<header class="topbar"><a class="brand" href="/citizen/"><span class="brand-mark">ST</span><span>Đô thị <b>lắng nghe</b></span></a><nav><a href="#guide">Hướng dẫn</a><a href="#history">Phản ánh của tôi</a></nav><div class="account"><span class="signed-out">Bạn chưa đăng nhập</span><div id="google-signin"></div><button id="logout" class="btn btn-quiet hidden">Đăng xuất</button></div></header>
+<main><section class="hero"><div><p class="eyebrow">SMART TRAFFIC &amp; URBAN INCIDENT CLASSIFIER</p><h1>Cùng xây dựng<br><em>đô thị tốt đẹp hơn.</em></h1><p class="lead">Gửi phản ánh về giao thông và hạ tầng đô thị. Hệ thống AI hỗ trợ phân loại để thông tin được tiếp nhận nhanh và đúng nơi.</p><a class="btn btn-light" href="#report">Gửi phản ánh ↓</a></div><div class="hero-art" aria-hidden="true"><div class="orbit"></div><div class="city">⌂</div><span class="hero-tag">● Lắng nghe từng phản ánh</span></div></section>
+<section class="steps" id="guide"><div><i>01</i><b>Mô tả sự việc</b><small>Chia sẻ điều bạn ghi nhận</small></div><div><i>02</i><b>Thêm ảnh &amp; vị trí</b><small>Giúp xác định hiện trường</small></div><div><i>03</i><b>AI hỗ trợ phân loại</b><small>Theo dõi mã phản ánh</small></div></section>
+<section class="layout"><div class="panel"><div class="heading"><div><p class="eyebrow">GỬI THÔNG TIN</p><h2>Tạo phản ánh mới</h2></div><span class="secure">● Bảo mật tài khoản</span></div><div id="auth-notice" class="notice"><b>Đăng nhập Google để tiếp tục.</b> Phản ánh được lưu trong tài khoản của bạn.</div>
+<form id="report-form"><fieldset id="fields" disabled><label for="content">Nội dung phản ánh <em>*</em></label><textarea id="content" minlength="5" maxlength="20000" rows="5" placeholder="Ví dụ: Đường Nguyễn Huệ xuất hiện ổ gà lớn, gây nguy hiểm cho xe máy..." required></textarea><div class="meta"><span>Mô tả rõ vị trí và tình trạng sự việc.</span><span id="chars">0 / 20.000</span></div>
+<div class="field-row"><div class="grow"><label for="address">Địa chỉ / khu vực</label><input id="address" maxlength="500" placeholder="Tên đường, phường/xã, quận/huyện..."></div><button class="btn btn-outline" id="locate" type="button">◎ Vị trí hiện tại</button></div>
+<div class="map-head"><div><label>Chọn vị trí trên bản đồ</label><small>Chạm vào bản đồ để ghim vị trí xảy ra sự việc.</small></div><span id="coords">Chưa chọn vị trí</span></div><div id="map" aria-label="Bản đồ chọn vị trí"></div>
+<div class="map-head"><div><label>Hình ảnh hiện trường</label><small>JPEG, PNG hoặc WebP · tối đa 5 ảnh, 5 MB mỗi ảnh</small></div><span id="image-count">0 / 5</span></div>
+<label class="dropzone" id="dropzone" for="images"><strong>＋</strong><b>Chọn hình ảnh</b><small>Kéo thả hoặc nhấn để chọn ảnh từ thiết bị</small><input id="images" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></label><div id="previews" class="previews"></div>
+<button class="btn btn-primary submit" id="submit" type="submit">Gửi phản ánh &amp; phân tích AI <span>→</span></button><p class="footnote">Kết quả AI mang tính hỗ trợ và có thể được cán bộ tiếp nhận xác nhận hoặc điều chỉnh.</p></fieldset></form><div id="message" class="message hidden" role="status"></div><section id="result" class="result hidden" aria-live="polite"></section></div>
+<aside><div class="side-card"><p class="eyebrow">MINH BẠCH &amp; ĐỒNG HÀNH</p><h3>Mỗi thông tin đều có giá trị.</h3><p>Phản ánh được lưu cùng mã theo dõi. Kết quả AI hỗ trợ cán bộ tiếp nhận xử lý nhanh hơn.</p><div class="side-item"><i>✳</i><div><b>11 nhóm sự việc</b><small>Giao thông và hạ tầng đô thị</small></div></div><div class="side-item"><i>⌖</i><div><b>Vị trí rõ ràng</b><small>Hỗ trợ xác định nơi cần xử lý</small></div></div><div class="side-item"><i>✓</i><div><b>Có mã theo dõi</b><small>Lưu lại lịch sử phản ánh của bạn</small></div></div></div><div class="help"><b>Cần hỗ trợ?</b><p>Hãy mô tả sự việc cụ thể và tránh đưa thông tin cá nhân nhạy cảm vào nội dung phản ánh.</p></div></aside></section>
+<section class="history" id="history"><div class="heading"><div><p class="eyebrow">LỊCH SỬ CỦA BẠN</p><h2>Phản ánh đã gửi</h2></div><button id="refresh" class="btn btn-outline" disabled>↻ Làm mới</button></div><div id="reports" class="reports"><div class="empty">Đăng nhập để xem các phản ánh bạn đã gửi.</div></div></section></main>
+<footer><a class="brand" href="/citizen/"><span class="brand-mark">ST</span><span>Đô thị <b>lắng nghe</b></span></a><span>Smart Traffic &amp; Urban Incident Classifier · Cổng người dân</span><a href="/admin/">Cổng quản trị</a></footer>
+</body></html>
