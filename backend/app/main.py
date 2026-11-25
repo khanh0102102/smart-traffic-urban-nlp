@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
 from app.api.routes.reports import router as reports_router
+from app.api.routes.predictions import router as predictions_router
 from app.core.config import settings
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
