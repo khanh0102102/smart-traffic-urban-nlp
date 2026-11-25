@@ -11,11 +11,15 @@ class PredictionCreate(BaseModel):
 
 
 class PredictionCategoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     code: str
     name: str
 
 
 class PredictionPreprocessingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     pipeline_version: str
     cleaned_text: str
@@ -26,6 +30,8 @@ class PredictionPreprocessingRead(BaseModel):
 
 
 class PredictionModelRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     name: str
     version: str
     algorithm: str
