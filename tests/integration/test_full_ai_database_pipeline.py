@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -184,9 +184,9 @@ def test_full_ai_review_dataset_and_training_lineage(pipeline_client):
     )
     assert review_response.status_code == 201, review_response.text
 
-    sample = db.scalar(select(DatasetSample).where(DatasetSample.dataset_id == dataset_id))
+    sample = db.scalar(select(DatasetSample).where(DatasetSample.dataset_id == UUID(dataset_id)))
     review = db.scalar(select(PredictionReview))
-    report = db.get(Report, report_id)
+    report = db.get(Report, UUID(report_id))
     assert sample is not None and sample.is_verified is True
     assert sample.raw_text == report.raw_content
     assert sample.processed_text == preprocessing.stopwords_removed_text
