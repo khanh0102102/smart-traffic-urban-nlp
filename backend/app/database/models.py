@@ -98,7 +98,7 @@ class ModelVersion(TimestampMixin, Base):
 
 class Prediction(TimestampMixin, Base):
     __tablename__ = "predictions"
-    __table_args__ = (CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_predictions_confidence"), Index("ix_predictions_report_created", "report_id", "created_at"), Index("ix_predictions_needs_review", "needs_review"))
+    __table_args__ = (CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_predictions_confidence"), CheckConstraint("confidence_type IN ('model_score', 'calibrated_probability', 'unavailable')", name="ck_predictions_confidence_type"), Index("ix_predictions_report_created", "report_id", "created_at"), Index("ix_predictions_needs_review", "needs_review"))
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     report_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("reports.id", ondelete="CASCADE"), nullable=False)
     preprocessing_run_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("preprocessing_runs.id", ondelete="SET NULL"))
