@@ -180,17 +180,43 @@ def _model_classes(model: Any) -> np.ndarray:
     return np.asarray(model.classes_, dtype=np.int64)
 
 
-def _decision_scores(model: Any, matrix: Any) -> np.ndarray:
-    scores = np.asarray(model.decision_function(matrix))
-    classes = _model_classes(model)
+def _align_estimator_decision_scores(
+    estimator: Any,
+    matrix: Any,
+    target_classes: np.ndarray,
+) -> np.ndarray:
+    scores = np.asarray(estimator.decision_function(matrix))
+    estimator_classes = np.asarray(estimator.classes_, dtype=np.int64)
     if scores.ndim == 1:
-        # Binary decision_function is positive for classes_[1].
+        # Binary decision_function is positive for estimator_classes_[1].
         scores = np.column_stack((-scores, scores))
-    if scores.shape[1] != len(classes):
+    if scores.shape[1] != len(estimator_classes):
         raise ValueError(
-            "SVM decision score dimensions do not match the fitted class labels."
+            "SVM decision score dimensions do not match the fitted estimator classes."
         )
-    return scores
+    aligned = np.zeros((matrix.shape[0], len(target_classes)), dtype=float)
+    target_positions = {int(value): index for index, value in enumerate(target_classes)}
+    for source_column, class_id in enumerate(estimator_classes):
+        if int(class_id) in target_positions:
+            aligned[:, target_positions[int(class_id)]] = scores[:, source_column]
+    return aligned
+
+
+def _decision_scores(model: Any, matrix: Any) -> np.ndarray:
+    classes = _model_classes(model)
+    if hasattr(model, "decision_function"):
+        return _align_estimator_decision_scores(model, matrix, classes)
+
+    # CalibratedClassifierCV exposes predict_proba but not decision_function.
+    # Average the underlying LinearSVC margins for a diagnostic decision score.
+    calibrated_estimators = getattr(model, "calibrated_classifiers_", None)
+    if calibrated_estimators:
+        fold_scores = [
+            _align_estimator_decision_scores(item.estimator, matrix, classes)
+            for item in calibrated_estimators
+        ]
+        return np.mean(fold_scores, axis=0)
+    raise TypeError("The fitted SVM estimator does not expose decision scores.")
 
 
 def _confidence_values(
@@ -536,7 +562,10 @@ def load_svm_bundle(
         raise TypeError("The saved vectorizer is not a TfidfVectorizer instance.")
     if not isinstance(bundle["label_encoder"], LabelEncoder):
         raise TypeError("The saved label encoder is not a LabelEncoder instance.")
-    if not hasattr(bundle["model"], "predict") or not hasattr(bundle["model"], "decision_function"):
+    model = bundle["model"]
+    is_linear_svc = isinstance(model, LinearSVC)
+    is_calibrated = isinstance(model, CalibratedClassifierCV)
+    if not hasattr(model, "predict") or not (is_linear_svc or is_calibrated):
         raise TypeError("The saved SVM estimator has an unexpected type.")
     if bundle["probability_calibrated"] and not hasattr(bundle["model"], "predict_proba"):
         raise ValueError("Bundle is marked calibrated but the estimator has no predict_proba.")
