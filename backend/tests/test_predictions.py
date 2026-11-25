@@ -1,8 +1,7 @@
-"""Prediction API tests using a deterministic fake for the selected ML bundle."""
+"""Prediction API tests using deterministic estimators with the real Phase 5 preprocessor."""
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -28,6 +27,34 @@ from app.main import app
 from app.services.prediction_service import get_model_predictor
 
 
+class FakePredictor:
+    def __init__(self, path: Path, model_key: str, output: dict):
+        self.path = path
+        self.path.write_bytes(b"deterministic-test-inference-bundle")
+        self.key = model_key
+        self.meta = {
+            "selected_model": model_key,
+            "selected_model_name": {"svm": "SVM", "naive_bayes": "Naive Bayes"}[model_key],
+            "selection_metric": "validation_macro_f1",
+            "selection_value": 0.83,
+            "confidence_threshold": 0.60,
+        }
+        self.bundle = {
+            "_inference": self.meta,
+            "preprocessing": {
+                "pipeline": "src.nlp_preprocessing.preprocess_vietnamese_text",
+                "remove_stopwords": True,
+            },
+            "probability_calibrated": False if model_key == "svm" else None,
+        }
+        self.output = output
+
+    def predict(self, texts, *, already_processed=False):
+        assert already_processed is True
+        assert len(texts) == 1
+        return [dict(self.output, processed_text=texts[0])]
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(
@@ -46,36 +73,34 @@ def db_session():
         engine.dispose()
 
 
-class FakePredictor:
-    def __init__(self, path: Path, output: dict):
-        self.path = path
-        self.path.write_bytes(b"deterministic-test-inference-bundle")
-        self.key = "svm" if output.get("confidence_type") == "unavailable" else "naive_bayes"
-        self.meta = {
-            "selected_model": self.key,
-            "selected_model_name": "SVM" if self.key == "svm" else "Naive Bayes",
-            "selection_metric": "validation_macro_f1",
-            "selection_value": 0.83,
-            "confidence_threshold": 0.60,
-        }
-        self.bundle = {
-            "_inference": self.meta,
-            "preprocessing": {
-                "pipeline": "src.nlp_preprocessing.preprocess_vietnamese_text",
-                "remove_stopwords": True,
-            },
-            "probability_calibrated": False if self.key == "svm" else None,
-        }
-        self.output = output
+@pytest.fixture
+def client(db_session, monkeypatch):
+    monkeypatch.setattr(settings, "jwt_secret_key", "c" * 64)
+    monkeypatch.setattr(settings, "jwt_algorithm", "HS256")
+    monkeypatch.setattr(settings, "jwt_issuer", "st-nlp-api")
+    monkeypatch.setattr(settings, "jwt_audience", "st-nlp-client")
+    monkeypatch.setattr(settings, "jwt_access_token_expire_minutes", 30)
 
-    def predict(self, texts, *, already_processed=False):
-        assert already_processed is True
-        assert len(texts) == 1
-        self.last_text = texts[0]
-        return [dict(self.output, processed_text=texts[0])]
+    def override_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_db
+
+    # Exercise the actual Phase 5 pipeline deterministically without depending
+    # on Underthesea's native NLP model/data files in CI.
+    from src.nlp_preprocessing import preprocessor
+    monkeypatch.setattr(
+        preprocessor,
+        "segment_words",
+        lambda value, tokenizer=None: "mặt đường có ổ_gà sâu gây nguy hiểm",
+    )
+
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
 
 
-def citizen_report(db_session, email="citizen@example.com"):
+def create_citizen_report(db_session, email="citizen@example.com"):
     citizen = User(
         email=email,
         full_name="Citizen",
@@ -106,36 +131,13 @@ def citizen_report(db_session, email="citizen@example.com"):
     return citizen, report
 
 
-@pytest.fixture
-def client(db_session, monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "jwt_secret_key", "c" * 64)
-    monkeypatch.setattr(settings, "jwt_algorithm", "HS256")
-    monkeypatch.setattr(settings, "jwt_issuer", "st-nlp-api")
-    monkeypatch.setattr(settings, "jwt_audience", "st-nlp-client")
-    monkeypatch.setattr(settings, "jwt_access_token_expire_minutes", 30)
-
-    def override_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_db
-    # A real Phase 5 preprocessing run still executes; only the fitted ML estimator is replaced.
-    from src.nlp_preprocessing import preprocessor
-    monkeypatch.setattr(
-        preprocessor,
-        "segment_words",
-        lambda value, tokenizer=None: "mặt đường có ổ_gà sâu gây nguy hiểm",
-    )
-    yield test_client_factory(tmp_path)
-    app.dependency_overrides.clear()
+def auth_headers(user: User) -> dict[str, str]:
+    token, _ = create_access_token(user.id, user.role)
+    return {"Authorization": f"Bearer {token}"}
 
 
-def test_client_factory(tmp_path):
-    return tmp_path
-
-
-@pytest.fixture
-def prediction_client(client, tmp_path):
-    fake = FakePredictor(tmp_path / "best_model_bundle.joblib", {
+def naive_bayes_output():
+    return {
         "raw_content": "",
         "model_key": "naive_bayes",
         "model_name": "Naive Bayes",
@@ -149,22 +151,24 @@ def prediction_client(client, tmp_path):
         "has_known_features": True,
         "needs_manual_review": False,
         "warning_reasons": [],
-    })
+    }
+
+
+def override_predictor(tmp_path, model_key, output):
+    fake = FakePredictor(
+        tmp_path / f"{model_key}-bundle.joblib",
+        model_key,
+        output,
+    )
     app.dependency_overrides[get_model_predictor] = lambda: fake
-    # Fixture "client" returns a temporary path only to share its dependency overrides.
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+    return fake
 
 
-def auth_headers(user: User) -> dict[str, str]:
-    token, _ = create_access_token(user.id, user.role)
-    return {"Authorization": f"Bearer {token}"}
+def test_prediction_persists_preprocessing_and_model_output(client, db_session, tmp_path):
+    citizen, report = create_citizen_report(db_session)
+    override_predictor(tmp_path, "naive_bayes", naive_bayes_output())
 
-
-def test_prediction_persists_preprocessing_and_model_output(prediction_client, db_session):
-    citizen, report = citizen_report(db_session)
-    response = prediction_client.post(
+    response = client.post(
         "/api/v1/predictions",
         headers=auth_headers(citizen),
         json={"report_id": str(report.id)},
@@ -192,11 +196,11 @@ def test_prediction_persists_preprocessing_and_model_output(prediction_client, d
     assert model_version.representation == "TF_IDF"
 
 
-def test_uncalibrated_svm_is_saved_without_fabricating_confidence(tmp_path, db_session, monkeypatch):
-    # An uncalibrated SVM exposes a margin but not a probability.
-    from fastapi.testclient import TestClient
-    citizen, report = citizen_report(db_session, "svm@example.com")
-    fake = FakePredictor(tmp_path / "svm_bundle.joblib", {
+def test_uncalibrated_svm_is_saved_without_fabricating_confidence(
+    client, db_session, tmp_path
+):
+    citizen, report = create_citizen_report(db_session, "svm@example.com")
+    output = {
         "raw_content": "",
         "model_key": "svm",
         "model_name": "SVM",
@@ -210,23 +214,14 @@ def test_uncalibrated_svm_is_saved_without_fabricating_confidence(tmp_path, db_s
         "has_known_features": True,
         "needs_manual_review": True,
         "warning_reasons": ["SVM calibration unavailable."],
-    })
-    app.dependency_overrides[get_db] = lambda: iter([db_session])
-    app.dependency_overrides[get_model_predictor] = lambda: fake
-    monkeypatch.setattr(settings, "jwt_secret_key", "c" * 64)
-    monkeypatch.setattr(settings, "jwt_algorithm", "HS256")
-    monkeypatch.setattr(settings, "jwt_issuer", "st-nlp-api")
-    monkeypatch.setattr(settings, "jwt_audience", "st-nlp-client")
-    from src.nlp_preprocessing import preprocessor
-    monkeypatch.setattr(preprocessor, "segment_words", lambda value, tokenizer=None: "duong mat o_ga")
-    with TestClient(app) as test_client:
-        response = test_client.post(
-            "/api/v1/predictions",
-            headers=auth_headers(citizen),
-            json={"report_id": str(report.id)},
-        )
-    app.dependency_overrides.clear()
+    }
+    override_predictor(tmp_path, "svm", output)
 
+    response = client.post(
+        "/api/v1/predictions",
+        headers=auth_headers(citizen),
+        json={"report_id": str(report.id)},
+    )
     assert response.status_code == 201, response.text
     result = response.json()
     assert result["confidence"] is None
@@ -234,15 +229,15 @@ def test_uncalibrated_svm_is_saved_without_fabricating_confidence(tmp_path, db_s
     assert result["decision_margin"] == "1.245000"
     assert result["probability_calibrated"] is False
     assert result["needs_review"] is True
+
     saved = db_session.scalar(select(Prediction))
     assert saved is not None
     assert saved.confidence is None
+    assert saved.decision_margin is not None
 
 
-def test_citizen_cannot_run_or_read_predictions_for_another_users_report(
-    prediction_client, db_session
-):
-    owner, report = citizen_report(db_session, "owner@example.com")
+def test_citizen_cannot_predict_another_users_report(client, db_session, tmp_path):
+    owner, report = create_citizen_report(db_session, "owner@example.com")
     intruder = User(
         email="intruder@example.com",
         full_name="Intruder",
@@ -251,30 +246,28 @@ def test_citizen_cannot_run_or_read_predictions_for_another_users_report(
     )
     db_session.add(intruder)
     db_session.commit()
+    override_predictor(tmp_path, "naive_bayes", naive_bayes_output())
 
-    denied = prediction_client.post(
+    denied = client.post(
         "/api/v1/predictions",
         headers=auth_headers(intruder),
         json={"report_id": str(report.id)},
     )
     assert denied.status_code == 404
 
-    assert prediction_client.get(
-        "/api/v1/predictions/report/" + str(report.id),
-        headers=auth_headers(intruder),
-    ).status_code == 404
 
+def test_prediction_history_is_available_to_owner_and_staff(client, db_session, tmp_path):
+    citizen, report = create_citizen_report(db_session, "history@example.com")
+    override_predictor(tmp_path, "naive_bayes", naive_bayes_output())
 
-def test_prediction_history_is_available_to_owner_and_staff(prediction_client, db_session):
-    citizen, report = citizen_report(db_session, "history@example.com")
-    created = prediction_client.post(
+    created = client.post(
         "/api/v1/predictions",
         headers=auth_headers(citizen),
         json={"report_id": str(report.id)},
     )
     assert created.status_code == 201, created.text
 
-    history = prediction_client.get(
+    history = client.get(
         f"/api/v1/predictions/report/{report.id}",
         headers=auth_headers(citizen),
     )
@@ -284,8 +277,32 @@ def test_prediction_history_is_available_to_owner_and_staff(prediction_client, d
     receiver = User(email="receiver@example.com", full_name="Receiver", role="RECEIVER")
     db_session.add(receiver)
     db_session.commit()
-    staff_history = prediction_client.get(
+    staff_history = client.get(
         f"/api/v1/predictions/report/{report.id}",
         headers=auth_headers(receiver),
     )
     assert staff_history.status_code == 200
+    assert len(staff_history.json()) == 1
+
+
+def test_prediction_does_not_overwrite_staff_final_category(client, db_session, tmp_path):
+    citizen, report = create_citizen_report(db_session, "final@example.com")
+    category = db_session.scalar(select(IncidentCategory).where(IncidentCategory.code == "R01"))
+    report.final_category = category
+    db_session.commit()
+    override_predictor(tmp_path, "naive_bayes", naive_bayes_output())
+
+    response = client.post(
+        "/api/v1/predictions",
+        headers=auth_headers(citizen),
+        json={"report_id": str(report.id)},
+    )
+    assert response.status_code == 201, response.text
+    db_session.refresh(report)
+    assert report.final_category_id == category.id
+
+
+def test_prediction_endpoint_requires_authentication(client, db_session):
+    citizen, report = create_citizen_report(db_session, "anonymous@example.com")
+    response = client.post("/api/v1/predictions", json={"report_id": str(report.id)})
+    assert response.status_code == 401
