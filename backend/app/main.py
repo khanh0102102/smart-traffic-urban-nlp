@@ -1,9 +1,10 @@
 """FastAPI application entry point for the ST-NLP backend."""
+from html import escape
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.auth import router as auth_router
@@ -17,6 +18,7 @@ from app.core.config import settings
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT_DIR / "frontend"
+GOOGLE_CLIENT_ID_PLACEHOLDER = "YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com"
 
 app = FastAPI(
     title=settings.app_name,
@@ -49,9 +51,16 @@ def root() -> RedirectResponse:
     return RedirectResponse(url="/citizen/", status_code=307)
 
 
-@app.get("/citizen/", include_in_schema=False)
-def citizen_portal() -> FileResponse:
-    return FileResponse(FRONTEND_DIR / "citizen" / "index.html")
+@app.get("/citizen/", include_in_schema=False, response_class=HTMLResponse)
+def citizen_portal() -> HTMLResponse:
+    """Serve the citizen portal with its Google OAuth client ID injected from the environment."""
+    html_path = FRONTEND_DIR / "citizen" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    html = html.replace(
+        GOOGLE_CLIENT_ID_PLACEHOLDER,
+        escape(settings.google_client_id or "", quote=True),
+    )
+    return HTMLResponse(content=html)
 
 
 @app.get("/admin/", include_in_schema=False)
