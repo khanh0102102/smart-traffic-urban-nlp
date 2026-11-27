@@ -1,0 +1,49 @@
+# Version control and local environments
+.git
+.github
+.venv
+venv
+ENV
+.env
+.env.*
+!.env.example
+
+# Python caches and test outputs
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+coverage.xml
+
+# Frontend/build caches
+node_modules
+dist
+.vite
+coverage
+
+# Private uploads and generated ML data/artifacts
+backend/storage
+ml/artifacts/*
+!ml/artifacts/.gitkeep
+ml/data/raw/*
+!ml/data/raw/.gitkeep
+ml/data/interim/*
+!ml/data/interim/.gitkeep
+ml/data/processed/*
+!ml/data/processed/.gitkeep
+ml/reports/*
+!ml/reports/.gitkeep
+
+# Tests are run in CI, not shipped in the runtime image
+tests
+backend/tests
+ml/tests
+
+# Editor and OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db

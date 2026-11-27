@@ -88,3 +88,39 @@ jobs:
           JWT_ISSUER: st-nlp-api
           JWT_AUDIENCE: st-nlp-client
         run: python -m pytest tests/e2e/test_browser_journeys.py -q
+
+  docker-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build and start the complete Docker stack
+        run: docker compose up -d --build
+
+      - name: Wait for API and database health
+        run: |
+          set -euo pipefail
+          ready=0
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8000/api/v1/health/database >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 5
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker compose ps
+            docker compose logs api postgres
+            exit 1
+          fi
+
+      - name: Smoke-test both portals and seeded categories
+        run: |
+          curl --fail --silent http://127.0.0.1:8000/citizen/ | grep -q "Cổng người dân"
+          curl --fail --silent http://127.0.0.1:8000/admin/ | grep -q "Quản trị hệ thống"
+          docker compose exec -T api python -c "from sqlalchemy import select, func; from app.database.session import SessionLocal; from app.database.models import IncidentCategory; db=SessionLocal(); count=db.scalar(select(func.count(IncidentCategory.id))); print('Incident categories:', count); assert count == 11; db.close()"
+
+      - name: Stop Docker stack
+        if: always()
+        run: docker compose down -v

@@ -4,18 +4,71 @@ services:
     container_name: stnlp-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-stnlp_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stnlp_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-stnlp}
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USER:-stnlp_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-stnlp_dev_password}
+      POSTGRES_DB: ${DB_NAME:-stnlp}
     volumes:
       - stnlp_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stnlp-api:local
+    container_name: stnlp-api
+    restart: unless-stopped
+    init: true
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_NAME: ${APP_NAME:-ST-NLP}
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      DB_DRIVER: ${DB_DRIVER:-postgresql+psycopg}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-${POSTGRES_DB:-stnlp}}
+      DB_USER: ${DB_USER:-${POSTGRES_USER:-stnlp_user}}
+      DB_PASSWORD: ${DB_PASSWORD:-${POSTGRES_PASSWORD:-stnlp_dev_password}}
+      SQL_ECHO: ${SQL_ECHO:-false}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-stnlp-local-development-only-change-this-before-deployment-2026}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      JWT_ISSUER: ${JWT_ISSUER:-st-nlp-api}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-st-nlp-client}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:8000","http://127.0.0.1:8000"]}'
+      REPORT_UPLOAD_DIR: /app/backend/storage
+      REPORT_MAX_UPLOAD_SIZE_BYTES: ${REPORT_MAX_UPLOAD_SIZE_BYTES:-5242880}
+      REPORT_MAX_ATTACHMENTS: ${REPORT_MAX_ATTACHMENTS:-5}
+      PREDICTION_BUNDLE_PATH: /app/ml/artifacts/inference/best_model_bundle.joblib
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - stnlp_report_uploads:/app/backend/storage
+      - ./ml/artifacts:/app/ml/artifacts
+      - ./ml/data/raw:/app/ml/data/raw
+      - ./ml/data/interim:/app/ml/data/interim
+      - ./ml/data/processed:/app/ml/data/processed
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/database', timeout=3)"
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 12
+      start_period: 45s
+
 volumes:
   stnlp_postgres_data:
+  stnlp_report_uploads:
