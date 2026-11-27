@@ -119,7 +119,7 @@ jobs:
         run: |
           curl --fail --silent http://127.0.0.1:8000/citizen/ | grep -q "Cổng người dân"
           curl --fail --silent http://127.0.0.1:8000/admin/ | grep -q "Quản trị hệ thống"
-          docker compose exec -T api python -c "from sqlalchemy import select, func; from app.database.session import SessionLocal; from app.database.models import IncidentCategory; db=SessionLocal(); print('Incident categories:', db.scalar(select(func.count(IncidentCategory.id)))); assert db.scalar(select(func.count(IncidentCategory.id))) == 11; db.close()"
+          docker compose exec -T api python -c "from sqlalchemy import select, func; from app.database.session import SessionLocal; from app.database.models import IncidentCategory; db=SessionLocal(); count=db.scalar(select(func.count(IncidentCategory.id))); print('Incident categories:', count); assert count == 11; db.close()"
 
       - name: Stop Docker stack
         if: always()
