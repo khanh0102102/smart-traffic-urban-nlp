@@ -10,27 +10,16 @@ ST-NLP is a Vietnamese NLP system for receiving citizen reports about traffic an
 
 - Git
 - Docker Desktop with Docker Compose v2
-- A .env file copied from .env.example
 
-### First run (Windows PowerShell)
-
-```powershell
-git clone https://github.com/khanh0102102/smart-traffic-urban-nlp.git
-cd smart-traffic-urban-nlp
-Copy-Item .env.example .env
-docker compose up -d --build
-```
-
-### First run (macOS / Linux)
+### First run (Windows PowerShell, macOS or Linux)
 
 ```bash
 git clone https://github.com/khanh0102102/smart-traffic-urban-nlp.git
 cd smart-traffic-urban-nlp
-cp .env.example .env
 docker compose up -d --build
 ```
 
-On the first run Docker downloads the base images, builds the API image and installs the Python dependencies inside that image. The API container then waits for PostgreSQL, applies Alembic migrations, inserts any missing R01–R11 categories, and starts Uvicorn. You do not run pip, Alembic or the seed script on the host.
+That is enough to start the local app with development defaults. Docker downloads the base images, builds the API image and installs all runtime dependencies inside the image. The API container waits for PostgreSQL, applies Alembic migrations, inserts any missing R01–R11 categories, and starts Uvicorn. No host Python, pip install, Alembic or seed command is needed.
 
 ### Open the application
 
@@ -40,11 +29,28 @@ On the first run Docker downloads the base images, builds the API image and inst
 - API health: http://localhost:8000/api/v1/health
 - Database health: http://localhost:8000/api/v1/health/database
 
+### Optional environment configuration
+
+The stack runs without a .env file. To customize credentials, Google OAuth, ports or other settings, create a local environment file:
+
+Windows PowerShell:
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+macOS / Linux:
+```bash
+cp .env.example .env
+```
+
+Compose reads .env automatically. The file is ignored by Git. Replace the development JWT secret and database password before exposing the application outside your machine.
+
 ### Create the first staff account
 
 After the containers are healthy, create an administrator from inside the API container. This does not require Python on the host:
 
-```powershell
+```bash
 docker compose exec api python -m app.core.staff_provision --email admin@example.com --full-name "System Admin" --role ADMIN
 ```
 
@@ -54,7 +60,7 @@ Enter the password when prompted. Repeat this only when you need another staff a
 
 Set GOOGLE_CLIENT_ID in .env to your Google OAuth Web Client ID, then recreate the API container:
 
-```powershell
+```bash
 docker compose up -d --force-recreate api
 ```
 
@@ -72,7 +78,7 @@ The ml/artifacts folder is mounted into the API container, so adding or replacin
 
 Training and ML scripts can also be invoked inside the container, for example:
 
-```powershell
+```bash
 docker compose run --rm api python ml/scripts/prepare_dataset.py --input ml/data/sample_reports.csv --text-column content --label-column category
 ```
 
@@ -80,7 +86,7 @@ See ml/README.md for the model preparation, training, evaluation and packaging w
 
 ## Daily commands
 
-```powershell
+```bash
 # Start or rebuild the whole application
 docker compose up -d --build
 
@@ -102,7 +108,7 @@ docker compose down
 
 To update the source code later:
 
-```powershell
+```bash
 git pull origin main
 docker compose up -d --build
 ```
@@ -124,19 +130,10 @@ The database is available to the API on the internal Docker network as postgres:
 
 ## Tests
 
-The automated CI pipeline runs JavaScript syntax/client tests, Python unit/API/integration tests, the Playwright browser journey with PostgreSQL, and a Docker Compose build/smoke test.
-
-For local test execution without installing Python on the host, use the container:
-
-```powershell
-docker compose run --rm api python -m pip install -r backend/requirements-dev.txt
-docker compose run --rm api python -m pytest -q
-```
-
-The test command above installs development-only test packages into a disposable container; it does not alter the runtime image. The normal application start does not install development dependencies.
+GitHub Actions runs JavaScript syntax/client tests, Python unit/API/integration tests, the Playwright browser journey with PostgreSQL, and a full Docker Compose build/smoke test. The production runtime image intentionally excludes test-only dependencies and test files.
 
 ## Security notes
 
-- The committed .env.example secret is for local development only. Replace JWT_SECRET_KEY, database passwords and OAuth settings before exposing the application outside your machine.
+- The default JWT secret and database password are for local development only. Replace them and configure Google OAuth before exposing the application outside your machine.
 - Never commit .env, real citizen data, uploaded images or trained model artifacts.
 - Staff accounts are provisioned explicitly; there is no public staff registration.
