@@ -95,9 +95,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Create local Docker environment
-        run: cp .env.example .env
-
       - name: Build and start the complete Docker stack
         run: docker compose up -d --build
 
@@ -121,7 +118,7 @@ jobs:
       - name: Smoke-test both portals and seeded categories
         run: |
           curl --fail --silent http://127.0.0.1:8000/citizen/ | grep -q "Cổng người dân"
-          curl --fail --silent http://127.0.0.1:8000/admin/ | grep -q "Cổng quản trị"
+          curl --fail --silent http://127.0.0.1:8000/admin/ | grep -q "Quản trị hệ thống"
           docker compose exec -T api python -c "from sqlalchemy import select, func; from app.database.session import SessionLocal; from app.database.models import IncidentCategory; db=SessionLocal(); print('Incident categories:', db.scalar(select(func.count(IncidentCategory.id)))); assert db.scalar(select(func.count(IncidentCategory.id))) == 11; db.close()"
 
       - name: Stop Docker stack
